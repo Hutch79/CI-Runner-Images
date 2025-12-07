@@ -152,15 +152,16 @@ jobs:
 
           if [ "$job_result" = "success" ]; then
             job_status="✅ Success"
-            # Get image size from registry
-            IMAGE_SIZE=$(docker manifest inspect "$dated_tag" 2>/dev/null | jq -r '.config.size // 0' 2>/dev/null || echo "Unknown")
-            if [ "$IMAGE_SIZE" = "0" ] || [ "$IMAGE_SIZE" = "Unknown" ]; then
-              IMAGE_SIZE="Unknown"
-            else
-              # Convert bytes to human readable format
-              if command -v numfmt >/dev/null 2>&1; then
-                IMAGE_SIZE=$(echo "$IMAGE_SIZE" | numfmt --to=iec-i --suffix=B)
+            # Get image size from registry by pulling and checking
+            IMAGE_SIZE="Unknown"
+            if docker pull "$dated_tag" >/dev/null 2>&1; then
+              # Get size from docker images output
+              RAW_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1 2>/dev/null || echo "")
+              if [ -n "$RAW_SIZE" ] && [ "$RAW_SIZE" != "<none>" ]; then
+                IMAGE_SIZE="$RAW_SIZE"
               fi
+              # Clean up the pulled image
+              docker rmi "$dated_tag" >/dev/null 2>&1 || true
             fi
           else
             job_status="❌ Failed ($job_result)"
