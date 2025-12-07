@@ -1,0 +1,123 @@
+name: Integration Testing
+
+on:
+  workflow_call:
+    inputs:
+      changed-images:
+        description: "JSON array of changed images"
+        required: true
+        type: string
+
+jobs:
+  dotnet-test:
+    runs-on: ubuntu-latest
+    if: contains(fromJson(inputs.changed-images), 'dotnet')
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Pull and test .NET image
+      run: |
+        CHANGED_IMAGES="${{ inputs.changed-images }}"
+        echo "Testing .NET images: $CHANGED_IMAGES"
+
+        for image in $(echo "$CHANGED_IMAGES" | jq -r '.[] | select(startswith("dotnet")) | .'); do
+          IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:$image-20251207"
+          echo "Testing .NET image: $IMAGE_TAG"
+
+          # Test .NET SDK functionality
+          docker run --rm -v $(pwd):/workspace -w /workspace $IMAGE_TAG bash -c "
+            echo 'Testing .NET SDK...'
+            dotnet --version
+            echo 'Creating test project...'
+            dotnet new console -n testapp --force
+            cd testapp
+            echo 'Building test project...'
+            dotnet build
+            echo 'Running test project...'
+            dotnet run
+            echo '✅ .NET integration test passed'
+          "
+        done
+
+  nodejs-test:
+    runs-on: ubuntu-latest
+    if: contains(fromJson(inputs.changed-images), 'base')
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Pull and test Node.js image
+      run: |
+        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:base-20251207"
+        echo "Testing Node.js in base image: $IMAGE_TAG"
+
+        # Test Node.js functionality
+        docker run --rm -v $(pwd):/workspace -w /workspace $IMAGE_TAG bash -c "
+          echo 'Testing Node.js...'
+          node --version
+          npm --version
+          echo 'Creating test package.json...'
+          echo '{\"name\":\"test\",\"version\":\"1.0.0\",\"scripts\":{\"build\":\"echo build\"}}' > package.json
+          echo 'Running npm install...'
+          npm install
+          echo 'Running npm build script...'
+          npm run build
+          echo '✅ Node.js integration test passed'
+        "
+
+  git-test:
+    runs-on: ubuntu-latest
+    if: contains(fromJson(inputs.changed-images), 'base')
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Pull and test Git image
+      run: |
+        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:base-20251207"
+        echo "Testing Git in base image: $IMAGE_TAG"
+
+        # Test Git functionality
+        docker run --rm -v $(pwd):/workspace -w /workspace $IMAGE_TAG bash -c "
+          echo 'Testing Git...'
+          git --version
+          echo 'Initializing test repository...'
+          mkdir test-repo && cd test-repo
+          git init
+          git config user.name 'Test User'
+          git config user.email 'test@example.com'
+          echo 'test content' > test.txt
+          git add test.txt
+          git commit -m 'Test commit'
+          echo '✅ Git integration test passed'
+        "
+
+  github-actions-test:
+    runs-on: ubuntu-latest
+    if: contains(fromJson(inputs.changed-images), 'base')
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Pull and test GitHub Actions environment
+      run: |
+        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:base-20251207"
+        echo "Testing GitHub Actions environment in base image: $IMAGE_TAG"
+
+        # Test GitHub Actions environment variables and tools
+        docker run --rm -v $(pwd):/workspace -w /workspace \
+          -e GITHUB_WORKSPACE=/workspace \
+          -e GITHUB_SHA="${{ github.sha }}" \
+          -e GITHUB_REF="${{ github.ref }}" \
+          $IMAGE_TAG bash -c "
+            echo 'Testing GitHub Actions environment...'
+            echo 'GITHUB_WORKSPACE: $GITHUB_WORKSPACE'
+            echo 'GITHUB_SHA: $GITHUB_SHA'
+            echo 'GITHUB_REF: $GITHUB_REF'
+            echo 'Current directory: $(pwd)'
+            echo 'Available tools:'
+            which curl && curl --version | head -1
+            which unzip && unzip -v | head -1
+            echo '✅ GitHub Actions environment test passed'
+          "

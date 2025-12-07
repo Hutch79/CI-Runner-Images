@@ -10,25 +10,25 @@ on:
 
 jobs:
   detect-changes:
-    uses: ./.github/workflows/pr/detect-changes.yml
+    uses: ./.github/workflows/detect-changes.yml
     secrets: inherit
 
   validate-images:
     needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/pr/validate-images.yml
+    uses: ./.github/workflows/validate-images.yml
     with:
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
 
   lint-dockerfiles:
-    uses: ./.github/workflows/pr/lint-dockerfiles.yml
+    uses: ./.github/workflows/lint-dockerfiles.yml
     secrets: inherit
 
   security-scan:
     needs: validate-images
     if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/pr/security-scan.yml
+    uses: ./.github/workflows/security-scan.yml
     with:
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
@@ -36,7 +36,7 @@ jobs:
   image-analysis:
     needs: validate-images
     if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/pr/image-analysis.yml
+    uses: ./.github/workflows/image-analysis.yml
     with:
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
@@ -44,18 +44,18 @@ jobs:
   multi-platform-test:
     needs: validate-images
     if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/pr/multi-platform-test.yml
+    uses: ./.github/workflows/multi-platform-test.yml
     with:
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
 
   dependency-check:
-    uses: ./.github/workflows/pr/dependency-check.yml
+    uses: ./.github/workflows/dependency-check.yml
     secrets: inherit
 
   summary:
     needs: [detect-changes, validate-images, lint-dockerfiles, security-scan, image-analysis, multi-platform-test, dependency-check]
-    uses: ./.github/workflows/pr/validation-summary.yml
+    uses: ./.github/workflows/validation-summary.yml
     with:
       detect-changes-result: ${{ needs.detect-changes.result }}
       validate-images-result: ${{ needs.validate-images.result }}
