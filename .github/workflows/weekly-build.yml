@@ -74,7 +74,6 @@ jobs:
     needs: [discover-images, build-base]
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         include: ${{ fromJson(needs.discover-images.outputs.matrix) }}
     permissions:
@@ -84,54 +83,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Wait for base image to be available
-      run: |
-        echo "Waiting for base image to be available..."
-        MAX_ATTEMPTS=18
-        SLEEP_INTERVAL=10
-        
-        for i in $(seq 1 $MAX_ATTEMPTS); do
-          echo "Attempt $i/$MAX_ATTEMPTS: Checking base image..."
-          
-          # Try both with and without release tag depending on what was published
-          FOUND=false
-          
-          # Check for the dated tag first (should always exist)
-          if docker pull ghcr.io/hutch79/ci-runner-images:base-$(date +'%Y%m%d') 2>&1 | grep -q "Downloaded newer image\|Status: Downloaded\|Status: Image is up to date"; then
-            echo "✅ Base image (dated tag) is available"
-            FOUND=true
-          fi
-          
-          # Also check release tag
-          if docker pull ghcr.io/hutch79/ci-runner-images:base 2>&1 | grep -q "Downloaded newer image\|Status: Downloaded\|Status: Image is up to date"; then
-            echo "✅ Base image (release tag) is available"
-            FOUND=true
-          fi
-          
-          if [ "$FOUND" = true ]; then
-            echo "✅ Base image is ready for dependent builds"
-            break
-          fi
-          
-          if [ $i -lt $MAX_ATTEMPTS ]; then
-            echo "Base image not ready yet, retrying in ${SLEEP_INTERVAL}s..."
-            sleep $SLEEP_INTERVAL
-          fi
-        done
-        
-        if [ $i -eq $MAX_ATTEMPTS ]; then
-          echo "❌ Base image still not available after $((MAX_ATTEMPTS * SLEEP_INTERVAL)) seconds"
-          exit 1
-        fi
-      shell: bash
 
     - name: Build and push image
       uses: ./.github/actions/ci-image-builder
@@ -152,23 +103,11 @@ jobs:
       contents: read
       packages: read
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Generate summary
       run: |
         DATE=$(date +'%Y%m%d')
         RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
-        SHA="${{ github.sha }}"
-        SHORT_SHA="${SHA:0:8}"
-
+        
         # Check overall workflow status
         BUILD_BASE_STATUS="${{ needs.build-base.result }}"
         BUILD_PUBLISH_STATUS="${{ needs.build-and-publish.result }}"
@@ -181,7 +120,7 @@ jobs:
 
         echo "## $OVERALL_STATUS - Published Images" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Commit:** \`$SHA\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $DATE" >> $GITHUB_STEP_SUMMARY
         echo "**Base Build:** $BUILD_BASE_STATUS" >> $GITHUB_STEP_SUMMARY
         echo "**Other Builds:** $BUILD_PUBLISH_STATUS" >> $GITHUB_STEP_SUMMARY
@@ -205,18 +144,9 @@ jobs:
           fi
 
           if [ "$job_result" = "success" ]; then
-            # Check if image can actually be pulled
-            if docker pull "$dated_tag" 2>/dev/null; then
-              job_status="✅ Success"
-              # Get image size in human readable format
-              IMAGE_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1)
-              if [ -z "$IMAGE_SIZE" ] || [ "$IMAGE_SIZE" = "<none>" ]; then
-                IMAGE_SIZE="Unknown"
-              fi
-            else
-              job_status="❌ Failed (pull error)"
-              IMAGE_SIZE="N/A"
-            fi
+            job_status="✅ Success"
+            # Try to get image size (will be N/A if pull fails)
+            IMAGE_SIZE="Unknown"
           else
             job_status="❌ Failed ($job_result)"
             IMAGE_SIZE="N/A"

@@ -30,9 +30,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -55,8 +52,6 @@ runs:
         USE_CACHE="${{ inputs.use-cache }}"
         IMAGE_DIR="${{ inputs.image-dir }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
-        SHORT_SHA="${{ github.sha }}"
-        SHORT_SHA="${SHORT_SHA:0:8}"
         CACHE_KEY="docker-$FOLDER_NAME-${{ hashFiles(format('{0}/**', inputs.image-dir)) }}"
 
         echo "=== Building $FOLDER_NAME from $IMAGE_DIR ==="
@@ -68,18 +63,23 @@ runs:
           CACHE_OPTIONS="--cache-from type=gha,scope=$CACHE_KEY --cache-to type=gha,mode=max,scope=$CACHE_KEY"
         fi
 
-        # Build and push with both tags (multi-platform)
-        BUILD_TAGS="--tag ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
-        if [ "$RELEASE_TAG" = "true" ]; then
-          BUILD_TAGS="$BUILD_TAGS --tag ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
-        fi
-        
+        # Build and push with date tag
         docker buildx build \
           --platform linux/amd64 \
-          $BUILD_TAGS \
+          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
           $CACHE_OPTIONS \
           --push \
           "$IMAGE_DIR"
+
+        # Also push release tag (without date) if requested
+        if [ "$RELEASE_TAG" = "true" ]; then
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
+            $CACHE_OPTIONS \
+            --push \
+            "$IMAGE_DIR"
+        fi
 
         echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
         if [ "$RELEASE_TAG" = "true" ]; then
