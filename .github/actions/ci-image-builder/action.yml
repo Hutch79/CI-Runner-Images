@@ -59,7 +59,7 @@ runs:
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
-          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME@$SHORT_SHA" \
+          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-sha-$SHORT_SHA" \
           --push \
           "$IMAGE_DIR"
 
@@ -73,7 +73,7 @@ runs:
         fi
 
         echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
-        echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME@$SHORT_SHA"
+        echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-sha-$SHORT_SHA"
         if [ "$RELEASE_TAG" = "true" ]; then
           echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
         fi

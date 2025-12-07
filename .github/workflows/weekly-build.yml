@@ -127,7 +127,7 @@ jobs:
         for image_dir in $IMAGES; do
           folder_name=$(basename "$image_dir")
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
-          sha_tag="ghcr.io/hutch79/ci-runner-images:$folder_name@$SHORT_SHA"
+          sha_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-sha-$SHORT_SHA"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
           # Pull the image to get its size
