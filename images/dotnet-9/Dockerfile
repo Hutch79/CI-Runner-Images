@@ -1,8 +1,9 @@
 # .NET 9 SDK Dockerfile for CI/CD jobs
 # Uses published base image from GHCR
-FROM ghcr.io/hutch79/ci-cd-base:main
+FROM ghcr.io/hutch79/ci-runner-images:base
 
 # Install .NET 9 SDK for build and test tooling
+# Using .NET install script (more up-to-date than apt packages)
 USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

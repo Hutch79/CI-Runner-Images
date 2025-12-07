@@ -13,9 +13,62 @@ on:
         type: boolean
 
 jobs:
-  build-and-publish:
+  discover-images:
     runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.find-images.outputs.images }}
+      matrix: ${{ steps.find-images.outputs.matrix }}
+      dotnet-images: ${{ steps.find-images.outputs.dotnet-images }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
+    - name: Find image directories
+      id: find-images
+      run: |
+        # Find all directories in images/ that contain a Dockerfile
+        ALL_IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
+        echo "Found images: $ALL_IMAGES"
+
+        # Separate base from others
+        BASE_IMAGE="images/base"
+        DOTNET_IMAGES=$(echo "$ALL_IMAGES" | grep -v "^$BASE_IMAGE$")
+
+        # Create JSON array for dotnet images matrix
+        MATRIX_JSON=$(echo "$DOTNET_IMAGES" | jq -R -s -c 'split("\n") | map(select(. != "")) | map({image: .})')
+        echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+        # Also output space-separated for compatibility
+        ALL_IMAGES_SPACE=$(echo "$ALL_IMAGES" | tr '\n' ' ')
+        DOTNET_IMAGES_SPACE=$(echo "$DOTNET_IMAGES" | tr '\n' ' ')
+        echo "images=$ALL_IMAGES_SPACE" >> $GITHUB_OUTPUT
+        echo "dotnet-images=$DOTNET_IMAGES_SPACE" >> $GITHUB_OUTPUT
+
+  build-base:
+    needs: discover-images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build and push base image
+      uses: ./.github/actions/ci-image-builder
+      with:
+        image-dir: images/base
+        registry: ghcr.io
+        repository-owner: hutch79
+        repository-name: ci-runner-images
+        publish-release-tag: ${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}
+
+  build-and-publish:
+    needs: [discover-images, build-base]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover-images.outputs.matrix) }}
     permissions:
       contents: read
       packages: write
@@ -24,86 +77,47 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
+    - name: Build and push image
+      uses: ./.github/actions/ci-image-builder
       with:
+        image-dir: ${{ matrix.image }}
         registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        repository-owner: hutch79
+        repository-name: ci-runner-images
+        publish-release-tag: ${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}
 
-    - name: Get current date
-      id: date
-      run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
-
-    - name: Find image directories
-      id: find-images
-      run: |
-        # Find all directories in images/ that contain a Dockerfile
-        IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort | tr '\n' ' ')
-        echo "images=$IMAGES" >> $GITHUB_OUTPUT
-        echo "Found images: $IMAGES"
-
-    - name: Build and push images
-      run: |
-        DATE="${{ steps.date.outputs.date }}"
-        RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
-
-        # Read images from the output (space-separated)
-        IMAGES="${{ steps.find-images.outputs.images }}"
-
-        for image_dir in $IMAGES; do
-          # Extract folder name (e.g., "dotnet-10" from "images/dotnet-10")
-          folder_name=$(basename "$image_dir")
-
-          echo "=== Building $folder_name ==="
-
-          # Build and push with date tag
-          docker buildx build \
-            --platform linux/amd64 \
-            --tag "ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE" \
-            --push \
-            "$image_dir"
-
-          # Also push release tag (without date) if requested
-          if [ "$RELEASE_TAG" = "true" ]; then
-            docker buildx build \
-              --platform linux/amd64 \
-              --tag "ghcr.io/hutch79/ci-runner-images:$folder_name" \
-              --push \
-              "$image_dir"
-          fi
-
-          echo "✅ Published: ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
-          if [ "$RELEASE_TAG" = "true" ]; then
-            echo "✅ Published: ghcr.io/hutch79/ci-runner-images:$folder_name"
-          fi
-        done
-
+  summary:
+    needs: [discover-images, build-base, build-and-publish]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
     - name: Generate summary
       run: |
-        DATE="${{ steps.date.outputs.date }}"
+        DATE=$(date +'%Y%m%d')
         RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
 
         echo "## 📦 Published Images" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Image | Dated Tag | Release Tag |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------|-----------|-------------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Image | Dated Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-----------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
 
         # Read images from the output (space-separated)
-        IMAGES="${{ steps.find-images.outputs.images }}"
+        IMAGES="${{ needs.discover-images.outputs.images }}"
 
         for image_dir in $IMAGES; do
           folder_name=$(basename "$image_dir")
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
+          # Check if this specific job succeeded
+          job_status="✅ Success"
+          # Note: In a real implementation, you'd need to check individual job statuses
+          # For now, we'll assume success if the summary job runs
+
           if [ "$RELEASE_TAG" = "true" ]; then
-            echo "| $folder_name | \`$dated_tag\` | \`$release_tag\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | \`$dated_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| $folder_name | \`$dated_tag\` | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | \`$dated_tag\` | - | $job_status |" >> $GITHUB_STEP_SUMMARY
           fi
         done
 

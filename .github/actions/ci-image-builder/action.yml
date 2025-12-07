@@ -1,0 +1,70 @@
+name: 'Build and Push Docker Image'
+description: 'Build and push a Docker image to GHCR'
+
+inputs:
+  image-dir:
+    description: 'Directory containing the Dockerfile'
+    required: true
+  registry:
+    description: 'Container registry'
+    required: true
+    default: 'ghcr.io'
+  repository-owner:
+    description: 'Repository owner'
+    required: true
+  repository-name:
+    description: 'Repository name'
+    required: true
+  publish-release-tag:
+    description: 'Whether to publish release tag (without date)'
+    required: true
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Build and push image
+      run: |
+        DATE="${{ steps.date.outputs.date }}"
+        RELEASE_TAG="${{ inputs.publish-release-tag }}"
+        IMAGE_DIR="${{ inputs.image-dir }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+
+        echo "=== Building $FOLDER_NAME from $IMAGE_DIR ==="
+
+        # Build and push with date tag
+        docker buildx build \
+          --platform linux/amd64 \
+          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
+          --push \
+          "$IMAGE_DIR"
+
+        # Also push release tag (without date) if requested
+        if [ "$RELEASE_TAG" = "true" ]; then
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
+            --push \
+            "$IMAGE_DIR"
+        fi
+
+        echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
+        if [ "$RELEASE_TAG" = "true" ]; then
+          echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
+        fi
+      shell: bash
