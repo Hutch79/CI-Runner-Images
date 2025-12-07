@@ -96,16 +96,26 @@ jobs:
       run: |
         echo "Waiting for base image to be available..."
         for i in {1..7}; do
+          echo "Attempt $i: Checking base image manifest..."
           if docker buildx imagetools inspect ghcr.io/hutch79/ci-runner-images:base >/dev/null 2>&1; then
-            echo "Base image manifest is available"
-            break
+            echo "✅ Base image manifest is available"
+            # Also verify it has the expected platforms
+            if docker buildx imagetools inspect ghcr.io/hutch79/ci-runner-images:base | grep -q "linux/amd64\|linux/arm64"; then
+              echo "✅ Base image has expected platforms"
+              break
+            else
+              echo "❌ Base image manifest exists but missing expected platforms"
+            fi
           else
-            echo "Base image manifest not yet available, retrying in 10 seconds... ($i/7)"
+            echo "❌ Base image manifest not yet available"
+          fi
+          if [ $i -lt 7 ]; then
+            echo "Retrying in 10 seconds... ($i/7)"
             sleep 10
           fi
         done
         if [ $i -eq 7 ]; then
-          echo "Base image manifest still not available after 1 minute"
+          echo "❌ Base image manifest still not available after 1 minute"
           exit 1
         fi
       shell: bash

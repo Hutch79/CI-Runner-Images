@@ -68,23 +68,18 @@ runs:
           CACHE_OPTIONS="--cache-from type=gha,scope=$CACHE_KEY --cache-to type=gha,mode=max,scope=$CACHE_KEY"
         fi
 
-        # Build and push with date tag (multi-platform)
+        # Build and push with both tags (multi-platform)
+        BUILD_TAGS="--tag ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
+        if [ "$RELEASE_TAG" = "true" ]; then
+          BUILD_TAGS="$BUILD_TAGS --tag ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
+        fi
+        
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
-          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
+          $BUILD_TAGS \
           $CACHE_OPTIONS \
           --push \
           "$IMAGE_DIR"
-
-        # Also push release tag (without date) if requested
-        if [ "$RELEASE_TAG" = "true" ]; then
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
-            $CACHE_OPTIONS \
-            --push \
-            "$IMAGE_DIR"
-        fi
 
         echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
         if [ "$RELEASE_TAG" = "true" ]; then
