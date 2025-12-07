@@ -19,6 +19,10 @@ inputs:
     description: 'Whether to publish release tag (without date)'
     required: true
     default: 'true'
+  use-cache:
+    description: 'Whether to use build cache for faster builds'
+    required: false
+    default: 'false'
   github-token:
     description: 'GitHub token for authentication'
     required: true
@@ -48,17 +52,27 @@ runs:
       run: |
         DATE="${{ steps.date.outputs.date }}"
         RELEASE_TAG="${{ inputs.publish-release-tag }}"
+        USE_CACHE="${{ inputs.use-cache }}"
         IMAGE_DIR="${{ inputs.image-dir }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
         SHORT_SHA="${{ github.sha }}"
         SHORT_SHA="${SHORT_SHA:0:8}"
+        CACHE_KEY="docker-$FOLDER_NAME-${{ hashFiles(format('{0}/**', inputs.image-dir)) }}"
 
         echo "=== Building $FOLDER_NAME from $IMAGE_DIR ==="
+
+        # Set up cache options
+        CACHE_OPTIONS=""
+        if [ "$USE_CACHE" = "true" ]; then
+          echo "Setting up Docker build cache..."
+          CACHE_OPTIONS="--cache-from type=gha,scope=$CACHE_KEY --cache-to type=gha,mode=max,scope=$CACHE_KEY"
+        fi
 
         # Build and push with date tag (multi-platform)
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
+          $CACHE_OPTIONS \
           --push \
           "$IMAGE_DIR"
 
@@ -67,6 +81,7 @@ runs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
+            $CACHE_OPTIONS \
             --push \
             "$IMAGE_DIR"
         fi

@@ -11,6 +11,11 @@ on:
         required: false
         default: 'true'
         type: boolean
+      use_cache:
+        description: 'Use build cache for faster builds'
+        required: false
+        default: 'true'
+        type: boolean
 
 jobs:
   discover-images:
@@ -62,6 +67,7 @@ jobs:
         repository-owner: hutch79
         repository-name: ci-runner-images
         publish-release-tag: ${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}
+        use-cache: ${{ github.event_name != 'schedule' }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-publish:
@@ -112,6 +118,7 @@ jobs:
         repository-owner: hutch79
         repository-name: ci-runner-images
         publish-release-tag: ${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}
+        use-cache: ${{ github.event_name != 'schedule' }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
   summary:
