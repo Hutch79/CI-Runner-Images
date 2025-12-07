@@ -11,6 +11,10 @@ on:
         description: "Result of lint-dockerfiles job"
         required: true
         type: string
+      build-images-result:
+        description: "Result of build-images job"
+        required: true
+        type: string
       security-scan-result:
         description: "Result of security-scan job"
         required: true
@@ -52,11 +56,13 @@ jobs:
         # Check job statuses with merge-blocking logic
         DETECT_STATUS="✅"
         LINT_STATUS="✅"
+        BUILD_STATUS="✅"
         SECURITY_STATUS="✅"
         ANALYSIS_STATUS="✅"
 
         if [ "${{ inputs.detect-changes-result }}" != "success" ]; then DETECT_STATUS="❌"; fi
         if [ "${{ inputs.lint-dockerfiles-result }}" != "success" ]; then LINT_STATUS="❌"; fi
+        if [ "${{ inputs.build-images-result }}" != "success" ] && [ "${{ inputs.build-images-result }}" != "skipped" ]; then BUILD_STATUS="❌"; fi
         if [ "${{ inputs.security-scan-result }}" != "success" ] && [ "${{ inputs.security-scan-result }}" != "skipped" ]; then SECURITY_STATUS="❌"; fi
         if [ "${{ inputs.image-analysis-result }}" != "success" ] && [ "${{ inputs.image-analysis-result }}" != "skipped" ]; then ANALYSIS_STATUS="⚠️"; fi
 
@@ -65,6 +71,7 @@ jobs:
         echo "|-------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
         echo "| Detect Changes | $DETECT_STATUS | No |" >> $GITHUB_STEP_SUMMARY
         echo "| Lint Dockerfiles | $LINT_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build Images | $BUILD_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
         echo "| Security Scan | $SECURITY_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
         echo "| Image Analysis | $ANALYSIS_STATUS | No |" >> $GITHUB_STEP_SUMMARY
 

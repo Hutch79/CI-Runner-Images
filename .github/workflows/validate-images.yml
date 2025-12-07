@@ -1,0 +1,112 @@
+name: Validate Imagesname: Validate Images
+
+
+
+on:on:
+
+  workflow_call:  workflow_call:
+
+    inputs:    inputs:
+
+      changed-images:      changed-images:
+
+        description: "JSON array of changed image directories"        description: "JSON array of changed image directories"
+
+        required: true        required: true
+
+        type: string        type: string
+
+
+
+jobs:jobs:
+
+  validate:  validate:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    strategy:    strategy:
+
+      matrix:      matrix:
+
+        include: ${{ fromJson(inputs.changed-images) }}        include: ${{ fromJson(inputs.changed-images) }}
+
+    permissions:    permissions:
+
+      contents: read      contents: read
+
+      packages: write      packages: write
+
+    steps:
+
+    - name: Checkout repository    steps:
+
+      uses: actions/checkout@v4    - name: Checkout repository
+
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+
+      uses: docker/setup-buildx-action@v3    - name: Build and validate image
+
+      uses: ./.github/actions/ci-image-builder
+
+    - name: Build image for validation      with:
+
+      run: |        image-dir: ${{ matrix.image }}
+
+        IMAGE_DIR="${{ matrix.image }}"        registry: ghcr.io
+
+        FOLDER_NAME=$(basename "$IMAGE_DIR")        repository-owner: hutch79
+
+        repository-name: ci-runner-images
+
+        echo "=== Building $FOLDER_NAME for validation ==="        publish-release-tag: false
+
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+        # Build the image (don't push)
+
+        docker buildx build \    - name: Basic smoke test
+
+          --platform linux/amd64 \      run: |
+
+          --tag "test-$FOLDER_NAME:pr-${{ github.event.number }}" \        IMAGE_DIR="${{ matrix.image }}"
+
+          --load \        FOLDER_NAME=$(basename "$IMAGE_DIR")
+
+          "$IMAGE_DIR"        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:$FOLDER_NAME@${{ github.sha }}"
+
+        IMAGE_TAG="${IMAGE_TAG:0:8}"
+
+        echo "✅ Built image: test-$FOLDER_NAME:pr-${{ github.event.number }}"
+
+        echo "Testing image: $IMAGE_TAG"
+
+    - name: Verify image functionality
+
+      run: |        # Pull the image
+
+        IMAGE_DIR="${{ matrix.image }}"        docker pull "$IMAGE_TAG"
+
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+
+        IMAGE_TAG="test-$FOLDER_NAME:pr-${{ github.event.number }}"        # Basic container test - check if it starts
+
+        docker run --rm "$IMAGE_TAG" echo "Container started successfully"
+
+        echo "=== Verifying $FOLDER_NAME functionality ==="
+
+        # For .NET images, check if dotnet is available
+
+        # Check if image runs without errors        if [[ "$FOLDER_NAME" == dotnet* ]]; then
+
+        docker run --rm "$IMAGE_TAG" echo "✅ Image runs successfully"          docker run --rm "$IMAGE_TAG" dotnet --version
+
+        fi
+        # For .NET images, verify dotnet is installed
+        if [[ "$IMAGE_DIR" == *"dotnet"* ]]; then
+          echo "Checking .NET installation..."
+          docker run --rm "$IMAGE_TAG" dotnet --version
+        fi
+
+        echo "✅ Image verification passed"

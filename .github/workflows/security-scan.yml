@@ -14,26 +14,34 @@ jobs:
     strategy:
       matrix:
         include: ${{ fromJson(inputs.changed-images) }}
+    permissions:
+      contents: read
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Run Trivy vulnerability scanner
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build image for security scan
       run: |
         IMAGE_DIR="${{ matrix.image }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
-        IMAGE_REF="ghcr.io/hutch79/ci-runner-images:$FOLDER_NAME@${{ github.sha }}"
-        IMAGE_REF="${IMAGE_REF:0:8}"
 
-        echo "Scanning image: $IMAGE_REF"
+        echo "Building $FOLDER_NAME for security scan..."
 
-        # Use Trivy to scan the image
-        docker run --rm \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          aquasec/trivy:latest image \
-          --format sarif \
-          --output trivy-results.sarif \
-          "$IMAGE_REF"
+        docker buildx build \
+          --platform linux/amd64 \
+          --tag "scan-$FOLDER_NAME:latest" \
+          --load \
+          "$IMAGE_DIR"
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasec/trivy-action@master
+      with:
+        image-ref: scan-${{ matrix.image && matrix.image | split('/') | last }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3

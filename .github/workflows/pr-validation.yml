@@ -17,8 +17,16 @@ jobs:
     uses: ./.github/workflows/lint-dockerfiles.yml
     secrets: inherit
 
-  security-scan:
+  build-images:
     needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    uses: ./.github/workflows/validate-images.yml
+    with:
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+    secrets: inherit
+
+  security-scan:
+    needs: [detect-changes, build-images]
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/security-scan.yml
     with:
@@ -26,7 +34,7 @@ jobs:
     secrets: inherit
 
   image-analysis:
-    needs: detect-changes
+    needs: [detect-changes, build-images]
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/image-analysis.yml
     with:
@@ -34,11 +42,12 @@ jobs:
     secrets: inherit
 
   summary:
-    needs: [detect-changes, lint-dockerfiles, security-scan, image-analysis]
+    needs: [detect-changes, lint-dockerfiles, build-images, security-scan, image-analysis]
     uses: ./.github/workflows/validation-summary.yml
     with:
       detect-changes-result: ${{ needs.detect-changes.result }}
       lint-dockerfiles-result: ${{ needs.lint-dockerfiles.result }}
+      build-images-result: ${{ needs.build-images.result }}
       security-scan-result: ${{ needs.security-scan.result }}
       image-analysis-result: ${{ needs.image-analysis.result }}
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
