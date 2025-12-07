@@ -1,6 +1,6 @@
 # .NET 10 SDK Dockerfile for CI/CD jobs
 # Uses published base image from GHCR
-FROM ci-cd-base
+FROM ghcr.io/hutch79/ci-cd-base:main
 
 # Install .NET 10 SDK for build and test tooling
 # Using .NET install script (more up-to-date than apt packages)
