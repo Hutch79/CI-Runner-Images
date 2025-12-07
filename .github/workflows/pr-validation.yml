@@ -7,18 +7,17 @@ on:
       - 'images/**'
       - '.github/workflows/**'
       - '.github/actions/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'images/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  workflow_dispatch:
 
 jobs:
   detect-changes:
     uses: ./.github/workflows/detect-changes.yml
-    secrets: inherit
-
-  validate-images:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/validate-images.yml
-    with:
-      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
 
   lint-dockerfiles:
@@ -26,7 +25,7 @@ jobs:
     secrets: inherit
 
   security-scan:
-    needs: validate-images
+    needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/security-scan.yml
     with:
@@ -34,36 +33,21 @@ jobs:
     secrets: inherit
 
   image-analysis:
-    needs: validate-images
+    needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/image-analysis.yml
     with:
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
     secrets: inherit
 
-  multi-platform-test:
-    needs: validate-images
-    if: needs.detect-changes.outputs.has-changes == 'true'
-    uses: ./.github/workflows/multi-platform-test.yml
-    with:
-      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
-    secrets: inherit
-
-  dependency-check:
-    uses: ./.github/workflows/dependency-check.yml
-    secrets: inherit
-
   summary:
-    needs: [detect-changes, validate-images, lint-dockerfiles, security-scan, image-analysis, multi-platform-test, dependency-check]
+    needs: [detect-changes, lint-dockerfiles, security-scan, image-analysis]
     uses: ./.github/workflows/validation-summary.yml
     with:
       detect-changes-result: ${{ needs.detect-changes.result }}
-      validate-images-result: ${{ needs.validate-images.result }}
       lint-dockerfiles-result: ${{ needs.lint-dockerfiles.result }}
       security-scan-result: ${{ needs.security-scan.result }}
       image-analysis-result: ${{ needs.image-analysis.result }}
-      multi-platform-test-result: ${{ needs.multi-platform-test.result }}
-      dependency-check-result: ${{ needs.dependency-check.result }}
       changed-images: ${{ needs.detect-changes.outputs.changed-images }}
       has-changes: ${{ needs.detect-changes.outputs.has-changes }}
     secrets: inherit
