@@ -92,7 +92,20 @@ jobs:
     needs: [discover-images, build-base, build-and-publish]
     runs-on: ubuntu-latest
     if: always()
+    permissions:
+      contents: read
+      packages: read
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Generate summary
       run: |
         DATE=$(date +'%Y%m%d')
@@ -105,8 +118,8 @@ jobs:
         echo "**Commit:** \`$SHA\`" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $DATE" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Image | Dated Tag | SHA Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------|-----------|---------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Image | Size | Dated Tag | SHA Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|------|-----------|---------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
 
         # Read images from the output (space-separated)
         IMAGES="${{ needs.discover-images.outputs.images }}"
@@ -117,15 +130,27 @@ jobs:
           sha_tag="ghcr.io/hutch79/ci-runner-images:$folder_name@$SHORT_SHA"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
+          # Pull the image to get its size
+          echo "Pulling image: $dated_tag"
+          if docker pull "$dated_tag" 2>/dev/null; then
+            # Get image size in human readable format
+            IMAGE_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1)
+            if [ -z "$IMAGE_SIZE" ] || [ "$IMAGE_SIZE" = "<none>" ]; then
+              IMAGE_SIZE="Unknown"
+            fi
+          else
+            IMAGE_SIZE="Pull failed"
+          fi
+
           # Check if this specific job succeeded
           job_status="✅ Success"
           # Note: In a real implementation, you'd need to check individual job statuses
           # For now, we'll assume success if the summary job runs
 
           if [ "$RELEASE_TAG" = "true" ]; then
-            echo "| $folder_name | \`$dated_tag\` | \`$sha_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | $IMAGE_SIZE | \`$dated_tag\` | \`$sha_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| $folder_name | \`$dated_tag\` | \`$sha_tag\` | - | $job_status |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | $IMAGE_SIZE | \`$dated_tag\` | \`$sha_tag\` | - | $job_status |" >> $GITHUB_STEP_SUMMARY
           fi
         done
 
