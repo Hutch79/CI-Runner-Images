@@ -19,7 +19,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for safer CI execution
-RUN useradd -m -u 1000 -s /bin/bash runner \
+RUN useradd -m -u 1001 -s /bin/bash runner \
  && mkdir -p /workspace \
  && chown runner:runner /workspace
 
