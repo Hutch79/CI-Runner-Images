@@ -97,11 +97,16 @@ jobs:
       run: |
         DATE=$(date +'%Y%m%d')
         RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
+        SHA="${{ github.sha }}"
+        SHORT_SHA="${SHA:0:8}"
 
         echo "## 📦 Published Images" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Image | Dated Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------|-----------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** \`$SHA\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $DATE" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Image | Dated Tag | SHA Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-----------|---------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
 
         # Read images from the output (space-separated)
         IMAGES="${{ needs.discover-images.outputs.images }}"
@@ -109,6 +114,7 @@ jobs:
         for image_dir in $IMAGES; do
           folder_name=$(basename "$image_dir")
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
+          sha_tag="ghcr.io/hutch79/ci-runner-images:$folder_name@$SHORT_SHA"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
           # Check if this specific job succeeded
@@ -117,9 +123,9 @@ jobs:
           # For now, we'll assume success if the summary job runs
 
           if [ "$RELEASE_TAG" = "true" ]; then
-            echo "| $folder_name | \`$dated_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | \`$dated_tag\` | \`$sha_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| $folder_name | \`$dated_tag\` | - | $job_status |" >> $GITHUB_STEP_SUMMARY
+            echo "| $folder_name | \`$dated_tag\` | \`$sha_tag\` | - | $job_status |" >> $GITHUB_STEP_SUMMARY
           fi
         done
 

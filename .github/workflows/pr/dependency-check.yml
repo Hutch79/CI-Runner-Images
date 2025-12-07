@@ -1,0 +1,46 @@
+name: Dependency Check
+
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check for outdated base images
+      run: |
+        echo "🔍 Checking for outdated base images..."
+
+        # Check Ubuntu version in base image
+        BASE_DOCKERFILE="images/base/Dockerfile"
+        if [ -f "$BASE_DOCKERFILE" ]; then
+          UBUNTU_VERSION=$(grep "FROM ubuntu:" "$BASE_DOCKERFILE" | cut -d: -f2)
+          echo "📋 Current Ubuntu version in base: $UBUNTU_VERSION"
+
+          # Could check against latest Ubuntu LTS here
+          echo "💡 Consider updating to Ubuntu 24.04 LTS if not already using it"
+        fi
+
+    - name: Check .NET versions
+      run: |
+        echo "🔍 Checking .NET versions in Dockerfiles..."
+
+        for dockerfile in images/dotnet*/Dockerfile; do
+          if [ -f "$dockerfile" ]; then
+            echo "📋 $dockerfile:"
+            grep -E "(dotnet|DOTNET)" "$dockerfile" | head -3
+          fi
+        done
+
+    - name: Check Node.js version
+      run: |
+        echo "🔍 Checking Node.js version in base image..."
+
+        BASE_DOCKERFILE="images/base/Dockerfile"
+        if [ -f "$BASE_DOCKERFILE" ]; then
+          NODE_VERSION=$(grep -E "(nodejs|node)" "$BASE_DOCKERFILE" | head -1)
+          echo "📋 Node.js reference: $NODE_VERSION"
+        fi

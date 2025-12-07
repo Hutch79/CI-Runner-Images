@@ -1,0 +1,56 @@
+name: Detect Changed Images
+
+on:
+  workflow_call:
+    outputs:
+      changed-images:
+        description: "JSON array of changed image directories"
+        value: ${{ jobs.detect.outputs.changed-images }}
+      has-changes:
+        description: "Whether any images have changes"
+        value: ${{ jobs.detect.outputs.has-changes }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-images: ${{ steps.detect.outputs.changed-images }}
+      has-changes: ${{ steps.detect.outputs.has-changes }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect changed images
+      id: detect
+      run: |
+        # Get changed files between base branch and PR
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
+
+        # Find image directories that have changes
+        CHANGED_IMAGES=$(echo "$CHANGED_FILES" | grep '^images/' | cut -d'/' -f2 | sort | uniq)
+
+        # Check if base image changed (affects all other images)
+        BASE_CHANGED=$(echo "$CHANGED_FILES" | grep '^images/base/' | wc -l)
+
+        if [ "$BASE_CHANGED" -gt 0 ]; then
+          # If base changed, build all images
+          ALL_IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
+          CHANGED_IMAGES=$(echo "$ALL_IMAGES" | tr '\n' ' ')
+        else
+          # Only build images that actually changed
+          CHANGED_IMAGES=$(echo "$CHANGED_IMAGES" | tr '\n' ' ')
+        fi
+
+        echo "Changed images: $CHANGED_IMAGES"
+
+        if [ -n "$CHANGED_IMAGES" ]; then
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          # Create JSON array for matrix
+          MATRIX_JSON=$(echo "$CHANGED_IMAGES" | jq -R -s -c 'split(" ") | map(select(. != "")) | map({image: .})')
+          echo "changed-images=$MATRIX_JSON" >> $GITHUB_OUTPUT
+        else
+          echo "has-changes=false" >> $GITHUB_OUTPUT
+          echo "changed-images=[]" >> $GITHUB_OUTPUT
+        fi

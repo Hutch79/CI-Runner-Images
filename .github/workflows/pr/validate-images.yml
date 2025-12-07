@@ -1,0 +1,53 @@
+name: Validate Images
+
+on:
+  workflow_call:
+    inputs:
+      changed-images:
+        description: "JSON array of changed image directories"
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(inputs.changed-images) }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build and validate image
+      uses: ./.github/actions/ci-image-builder
+      with:
+        image-dir: ${{ matrix.image }}
+        registry: ghcr.io
+        repository-owner: hutch79
+        repository-name: ci-runner-images
+        publish-release-tag: false
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Basic smoke test
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:$FOLDER_NAME@${{ github.sha }}"
+        IMAGE_TAG="${IMAGE_TAG:0:8}"
+
+        echo "Testing image: $IMAGE_TAG"
+
+        # Pull the image
+        docker pull "$IMAGE_TAG"
+
+        # Basic container test - check if it starts
+        docker run --rm "$IMAGE_TAG" echo "Container started successfully"
+
+        # For .NET images, check if dotnet is available
+        if [[ "$FOLDER_NAME" == dotnet* ]]; then
+          docker run --rm "$IMAGE_TAG" dotnet --version
+        fi

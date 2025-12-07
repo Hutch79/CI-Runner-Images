@@ -1,0 +1,21 @@
+name: Lint Dockerfiles
+
+on:
+  workflow_call:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Hadolint
+      run: |
+        wget -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+        chmod +x hadolint
+        sudo mv hadolint /usr/local/bin/
+
+    - name: Lint Dockerfiles
+      run: |
+        find images -name "Dockerfile" -exec hadolint {} \;

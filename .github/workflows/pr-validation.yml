@@ -1,0 +1,69 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'images/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+
+jobs:
+  detect-changes:
+    uses: ./.github/workflows/pr/detect-changes.yml
+    secrets: inherit
+
+  validate-images:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    uses: ./.github/workflows/pr/validate-images.yml
+    with:
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+    secrets: inherit
+
+  lint-dockerfiles:
+    uses: ./.github/workflows/pr/lint-dockerfiles.yml
+    secrets: inherit
+
+  security-scan:
+    needs: validate-images
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    uses: ./.github/workflows/pr/security-scan.yml
+    with:
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+    secrets: inherit
+
+  image-analysis:
+    needs: validate-images
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    uses: ./.github/workflows/pr/image-analysis.yml
+    with:
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+    secrets: inherit
+
+  multi-platform-test:
+    needs: validate-images
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    uses: ./.github/workflows/pr/multi-platform-test.yml
+    with:
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+    secrets: inherit
+
+  dependency-check:
+    uses: ./.github/workflows/pr/dependency-check.yml
+    secrets: inherit
+
+  summary:
+    needs: [detect-changes, validate-images, lint-dockerfiles, security-scan, image-analysis, multi-platform-test, dependency-check]
+    uses: ./.github/workflows/pr/validation-summary.yml
+    with:
+      detect-changes-result: ${{ needs.detect-changes.result }}
+      validate-images-result: ${{ needs.validate-images.result }}
+      lint-dockerfiles-result: ${{ needs.lint-dockerfiles.result }}
+      security-scan-result: ${{ needs.security-scan.result }}
+      image-analysis-result: ${{ needs.image-analysis.result }}
+      multi-platform-test-result: ${{ needs.multi-platform-test.result }}
+      dependency-check-result: ${{ needs.dependency-check.result }}
+      changed-images: ${{ needs.detect-changes.outputs.changed-images }}
+      has-changes: ${{ needs.detect-changes.outputs.has-changes }}
+    secrets: inherit

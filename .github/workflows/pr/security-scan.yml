@@ -1,0 +1,52 @@
+name: Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      changed-images:
+        description: "JSON array of changed image directories"
+        required: true
+        type: string
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(inputs.changed-images) }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        IMAGE_REF="ghcr.io/hutch79/ci-runner-images:$FOLDER_NAME@${{ github.sha }}"
+        IMAGE_REF="${IMAGE_REF:0:8}"
+
+        echo "Scanning image: $IMAGE_REF"
+
+        # Use Trivy to scan the image
+        docker run --rm \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy:latest image \
+          --format sarif \
+          --output trivy-results.sarif \
+          "$IMAGE_REF"
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Check for critical vulnerabilities
+      run: |
+        # This will fail the job if critical vulnerabilities are found
+        if grep -q '"severity": "CRITICAL"' trivy-results.sarif; then
+          echo "❌ Critical vulnerabilities found! Blocking merge."
+          exit 1
+        else
+          echo "✅ No critical vulnerabilities found."
+        fi

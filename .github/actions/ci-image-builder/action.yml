@@ -26,6 +26,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -47,26 +50,30 @@ runs:
         RELEASE_TAG="${{ inputs.publish-release-tag }}"
         IMAGE_DIR="${{ inputs.image-dir }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
+        SHORT_SHA="${{ github.sha }}"
+        SHORT_SHA="${SHORT_SHA:0:8}"
 
         echo "=== Building $FOLDER_NAME from $IMAGE_DIR ==="
 
-        # Build and push with date tag
+        # Build and push with date and SHA tags (multi-platform)
         docker buildx build \
-          --platform linux/amd64 \
+          --platform linux/amd64,linux/arm64 \
           --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
+          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME@$SHORT_SHA" \
           --push \
           "$IMAGE_DIR"
 
         # Also push release tag (without date) if requested
         if [ "$RELEASE_TAG" = "true" ]; then
           docker buildx build \
-            --platform linux/amd64 \
+            --platform linux/amd64,linux/arm64 \
             --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
             --push \
             "$IMAGE_DIR"
         fi
 
         echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
+        echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME@$SHORT_SHA"
         if [ "$RELEASE_TAG" = "true" ]; then
           echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
         fi

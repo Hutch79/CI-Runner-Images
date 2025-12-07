@@ -1,0 +1,93 @@
+name: Validation Summary
+
+on:
+  workflow_call:
+    inputs:
+      detect-changes-result:
+        description: "Result of detect-changes job"
+        required: true
+        type: string
+      validate-images-result:
+        description: "Result of validate-images job"
+        required: true
+        type: string
+      lint-dockerfiles-result:
+        description: "Result of lint-dockerfiles job"
+        required: true
+        type: string
+      security-scan-result:
+        description: "Result of security-scan job"
+        required: true
+        type: string
+      image-analysis-result:
+        description: "Result of image-analysis job"
+        required: true
+        type: string
+      multi-platform-test-result:
+        description: "Result of multi-platform-test job"
+        required: true
+        type: string
+      dependency-check-result:
+        description: "Result of dependency-check job"
+        required: true
+        type: string
+      changed-images:
+        description: "JSON array of changed images"
+        required: true
+        type: string
+      has-changes:
+        description: "Whether any images have changes"
+        required: true
+        type: string
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: PR Validation Summary
+      run: |
+        echo "## 🔍 PR Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ inputs.has-changes }}" = "true" ]; then
+          echo "### 📦 Images Built & Tested" >> $GITHUB_STEP_SUMMARY
+          CHANGED_IMAGES="${{ inputs.changed-images }}"
+          echo "$CHANGED_IMAGES" | jq -r '.[] | "- \(.image)"' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### 📦 No Image Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "No images were modified in this PR." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Check job statuses with merge-blocking logic
+        DETECT_STATUS="✅"
+        VALIDATE_STATUS="✅"
+        LINT_STATUS="✅"
+        SECURITY_STATUS="✅"
+        ANALYSIS_STATUS="✅"
+        MULTI_PLATFORM_STATUS="✅"
+        DEPENDENCY_STATUS="✅"
+
+        if [ "${{ inputs.detect-changes-result }}" != "success" ]; then DETECT_STATUS="❌"; fi
+        if [ "${{ inputs.validate-images-result }}" != "success" ] && [ "${{ inputs.validate-images-result }}" != "skipped" ]; then VALIDATE_STATUS="❌"; fi
+        if [ "${{ inputs.lint-dockerfiles-result }}" != "success" ]; then LINT_STATUS="❌"; fi
+        if [ "${{ inputs.security-scan-result }}" != "success" ] && [ "${{ inputs.security-scan-result }}" != "skipped" ]; then SECURITY_STATUS="❌"; fi
+        if [ "${{ inputs.image-analysis-result }}" != "success" ] && [ "${{ inputs.image-analysis-result }}" != "skipped" ]; then ANALYSIS_STATUS="⚠️"; fi
+        if [ "${{ inputs.multi-platform-test-result }}" != "success" ] && [ "${{ inputs.multi-platform-test-result }}" != "skipped" ]; then MULTI_PLATFORM_STATUS="❌"; fi
+        if [ "${{ inputs.dependency-check-result }}" != "success" ]; then DEPENDENCY_STATUS="ℹ️"; fi
+
+        echo "### ✅ Validation Checks" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status | Blocks Merge |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Detect Changes | $DETECT_STATUS | No |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build & Test Images | $VALIDATE_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lint Dockerfiles | $LINT_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scan | $SECURITY_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
+        echo "| Image Analysis | $ANALYSIS_STATUS | No |" >> $GITHUB_STEP_SUMMARY
+        echo "| Multi-Platform Test | $MULTI_PLATFORM_STATUS | Yes |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dependency Check | $DEPENDENCY_STATUS | No |" >> $GITHUB_STEP_SUMMARY
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Legend:** ✅ Pass | ❌ Fail (blocks merge) | ⚠️ Warning | ℹ️ Info" >> $GITHUB_STEP_SUMMARY

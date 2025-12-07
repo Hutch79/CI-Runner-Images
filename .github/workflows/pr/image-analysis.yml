@@ -1,0 +1,40 @@
+name: Image Analysis
+
+on:
+  workflow_call:
+    inputs:
+      changed-images:
+        description: "JSON array of changed image directories"
+        required: true
+        type: string
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(inputs.changed-images) }}
+    steps:
+    - name: Check image size
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        IMAGE_TAG="ghcr.io/hutch79/ci-runner-images:$FOLDER_NAME@${{ github.sha }}"
+        IMAGE_TAG="${IMAGE_TAG:0:8}"
+
+        echo "📏 Checking size for: $IMAGE_TAG"
+
+        # Pull image and get size
+        docker pull "$IMAGE_TAG" --quiet
+
+        # Get image size in bytes
+        SIZE_BYTES=$(docker image inspect "$IMAGE_TAG" --format='{{.Size}}')
+        SIZE_MB=$((SIZE_BYTES / 1024 / 1024))
+        SIZE_GB=$((SIZE_MB / 1024))
+
+        echo "📏 Image size for $FOLDER_NAME: ${SIZE_MB}MB (${SIZE_GB}GB)"
+
+        # Warning if size > 2GB (doesn't block merge)
+        if [ "$SIZE_GB" -ge 2 ]; then
+          echo "⚠️  Warning: Image size is ${SIZE_GB}GB, consider optimization"
+        fi
