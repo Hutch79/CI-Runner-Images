@@ -7,13 +7,6 @@ on:
       - 'images/**'
       - '.github/workflows/**'
       - '.github/actions/**'
-  push:
-    branches: [ main ]
-    paths:
-      - 'images/**'
-      - '.github/workflows/**'
-      - '.github/actions/**'
-  workflow_dispatch:
 
 jobs:
   detect-changes:
