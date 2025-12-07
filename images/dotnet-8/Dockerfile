@@ -1,5 +1,6 @@
 # .NET 8 SDK Dockerfile for CI/CD jobs
-FROM ci-cd-base
+# Uses published base image from GHCR
+FROM ghcr.io/hutch79/ci-cd-base:main
 
 # Install .NET 8 SDK for build and test tooling
 RUN apt-get update \

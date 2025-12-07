@@ -1,0 +1,106 @@
+name: Weekly Build and Publish Images
+
+on:
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      publish_release_tags:
+        description: 'Also publish release tags (without date)'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+    - name: Find image directories
+      id: find-images
+      run: |
+        # Find all directories in images/ that contain a Dockerfile
+        IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
+        echo "images=$IMAGES" >> $GITHUB_OUTPUT
+        echo "Found images: $IMAGES"
+
+    - name: Build and push images
+      run: |
+        DATE="${{ steps.date.outputs.date }}"
+        RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
+
+        for image_dir in ${{ steps.find-images.outputs.images }}; do
+          # Extract folder name (e.g., "dotnet-10" from "images/dotnet-10")
+          folder_name=$(basename "$image_dir")
+
+          echo "=== Building $folder_name ==="
+
+          # Build and push with date tag
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE" \
+            --push \
+            "$image_dir"
+
+          # Also push release tag (without date) if requested
+          if [ "$RELEASE_TAG" = "true" ]; then
+            docker buildx build \
+              --platform linux/amd64 \
+              --tag "ghcr.io/hutch79/ci-runner-images:$folder_name" \
+              --push \
+              "$image_dir"
+          fi
+
+          echo "✅ Published: ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
+          if [ "$RELEASE_TAG" = "true" ]; then
+            echo "✅ Published: ghcr.io/hutch79/ci-runner-images:$folder_name"
+          fi
+        done
+
+    - name: Generate summary
+      run: |
+        DATE="${{ steps.date.outputs.date }}"
+        RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
+
+        echo "## 📦 Published Images" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Image | Dated Tag | Release Tag |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-----------|-------------|" >> $GITHUB_STEP_SUMMARY
+
+        for image_dir in ${{ steps.find-images.outputs.images }}; do
+          folder_name=$(basename "$image_dir")
+          dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
+          release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
+
+          if [ "$RELEASE_TAG" = "true" ]; then
+            echo "| $folder_name | \`$dated_tag\` | \`$release_tag\` |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| $folder_name | \`$dated_tag\` | - |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Next Run" >> $GITHUB_STEP_SUMMARY
+        echo "This workflow runs weekly on Mondays at 00:00 UTC." >> $GITHUB_STEP_SUMMARY

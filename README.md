@@ -21,49 +21,70 @@ Extend the base image with .NET SDKs for build and test tooling:
 
 ## Automated Publishing
 
-The base image is automatically published to GitHub Container Registry (GHCR) when changes are made to the `images/base/` directory.
+### Weekly Builds
+All images are automatically built and published weekly on **Mondays at 00:00 UTC** via GitHub Actions.
 
-### Published Images
-- **Base Image**: `ghcr.io/hutch79/ci-cd-base:latest`
-- Tagged with branch names, PR numbers, and commit SHAs for traceability
+**Published to**: `ghcr.io/hutch79/ci-runner-images:<folder-name>-<date>`
 
-### Using Published Images
-```bash
-# Pull and use the published base image
-docker pull ghcr.io/hutch79/ci-cd-base:latest
+**Examples**:
+- `ghcr.io/hutch79/ci-runner-images:base-20251207`
+- `ghcr.io/hutch79/ci-runner-images:dotnet-10-20251207`
+- `ghcr.io/hutch79/ci-runner-images:dotnet-20251207`
 
-# Or reference it directly in FROM statements
-FROM ghcr.io/hutch79/ci-cd-base:latest
-```
+### Release Tags
+Weekly builds also create release tags **without dates** for stable references:
+- `ghcr.io/hutch79/ci-runner-images:base`
+- `ghcr.io/hutch79/ci-runner-images:dotnet-10`
+- `ghcr.io/hutch79/ci-runner-images:dotnet`
+
+### Base Image Publishing
+The base image is also published when changes are made to `images/base/` with tags like:
+- `ghcr.io/hutch79/ci-cd-base:main` (branch-based)
+- `ghcr.io/hutch79/ci-cd-base:latest` (default branch)
+
+### Manual Triggers
+You can manually trigger the weekly build workflow from the GitHub Actions tab.
 
 ## Building Images
+
+### Local Development
+For local development and testing:
 
 ```bash
 # Build base image
 docker build -t ci-cd-base ./images/base
 
-# Build .NET images (all require base image)
-docker build -t ci-cd-dotnet ./images/dotnet          # Multi-version (8, 9, 10)
+# Build .NET images (use published base image from GHCR)
+docker build -t ci-cd-dotnet ./images/dotnet
 docker build -t ci-cd-dotnet-8 ./images/dotnet-8
 docker build -t ci-cd-dotnet-9 ./images/dotnet-9
 docker build -t ci-cd-dotnet-10 ./images/dotnet-10
 ```
 
+### Automated Weekly Builds
+All images are automatically built and published **weekly on Mondays at 00:00 UTC**. Use the published images for production CI/CD pipelines.
+
+### Using Published Images
+All images are available on GitHub Container Registry with weekly automated builds:
+- **Base**: `ghcr.io/hutch79/ci-runner-images:base-YYYYMMDD`
+- **Multi .NET**: `ghcr.io/hutch79/ci-runner-images:dotnet-YYYYMMDD`
+- **.NET 8**: `ghcr.io/hutch79/ci-runner-images:dotnet-8-YYYYMMDD`
+- **.NET 9**: `ghcr.io/hutch79/ci-runner-images:dotnet-9-YYYYMMDD`
+- **.NET 10**: `ghcr.io/hutch79/ci-runner-images:dotnet-10-YYYYMMDD`
+
+**Release tags** (without dates) are also available for stable references.
+
 ## Usage
 
 ```bash
-# Run base image
-docker run -it --rm ci-cd-base
+# Use latest weekly builds (recommended for stability)
+docker run -it --rm ghcr.io/hutch79/ci-runner-images:base
+docker run -it --rm ghcr.io/hutch79/ci-runner-images:dotnet-10
 
-# Run .NET images
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet     # Multi-version
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet-8
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet-9
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet-10
+# Use specific dated versions
+docker run -it --rm ghcr.io/hutch79/ci-runner-images:base-20251207
+docker run -it --rm ghcr.io/hutch79/ci-runner-images:dotnet-10-20251207
 
-# Switch .NET versions in multi-version image
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet \
-  dotnet --version  # Shows default (latest)
-docker run -it --rm -v $(pwd):/workspace ci-cd-dotnet \
-  dotnet test --framework net8.0
+# Use in CI/CD pipelines
+FROM ghcr.io/hutch79/ci-runner-images:dotnet-10:latest
 ```
