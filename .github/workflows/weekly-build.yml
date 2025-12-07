@@ -156,10 +156,22 @@ jobs:
         SHA="${{ github.sha }}"
         SHORT_SHA="${SHA:0:8}"
 
-        echo "## 📦 Published Images" >> $GITHUB_STEP_SUMMARY
+        # Check overall workflow status
+        BUILD_BASE_STATUS="${{ needs.build-base.result }}"
+        BUILD_PUBLISH_STATUS="${{ needs.build-and-publish.result }}"
+        
+        if [ "$BUILD_BASE_STATUS" = "success" ] && [ "$BUILD_PUBLISH_STATUS" = "success" ]; then
+          OVERALL_STATUS="✅ **SUCCESS**"
+        else
+          OVERALL_STATUS="❌ **FAILED**"
+        fi
+
+        echo "## $OVERALL_STATUS - Published Images" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Commit:** \`$SHA\`" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $DATE" >> $GITHUB_STEP_SUMMARY
+        echo "**Base Build:** $BUILD_BASE_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "**Other Builds:** $BUILD_PUBLISH_STATUS" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Image | Size | Dated Tag | Release Tag | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|-------|------|-----------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
@@ -172,16 +184,28 @@ jobs:
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
-          # Check if this specific job succeeded by trying to pull the image
-          if docker pull "$dated_tag" 2>/dev/null; then
-            job_status="✅ Success"
-            # Get image size in human readable format
-            IMAGE_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1)
-            if [ -z "$IMAGE_SIZE" ] || [ "$IMAGE_SIZE" = "<none>" ]; then
-              IMAGE_SIZE="Unknown"
+          # Determine job status based on which job handles this image
+          if [ "$folder_name" = "base" ]; then
+            job_result="$BUILD_BASE_STATUS"
+          else
+            job_result="$BUILD_PUBLISH_STATUS"
+          fi
+
+          if [ "$job_result" = "success" ]; then
+            # Check if image can actually be pulled
+            if docker pull "$dated_tag" 2>/dev/null; then
+              job_status="✅ Success"
+              # Get image size in human readable format
+              IMAGE_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1)
+              if [ -z "$IMAGE_SIZE" ] || [ "$IMAGE_SIZE" = "<none>" ]; then
+                IMAGE_SIZE="Unknown"
+              fi
+            else
+              job_status="❌ Failed (pull error)"
+              IMAGE_SIZE="N/A"
             fi
           else
-            job_status="❌ Failed"
+            job_status="❌ Failed ($job_result)"
             IMAGE_SIZE="N/A"
           fi
 
