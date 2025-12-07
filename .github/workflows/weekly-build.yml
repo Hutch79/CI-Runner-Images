@@ -95,27 +95,40 @@ jobs:
     - name: Wait for base image to be available
       run: |
         echo "Waiting for base image to be available..."
-        for i in {1..7}; do
-          echo "Attempt $i: Checking base image manifest..."
-          if docker buildx imagetools inspect ghcr.io/hutch79/ci-runner-images:base >/dev/null 2>&1; then
-            echo "✅ Base image manifest is available"
-            # Also verify it has the expected platforms
-            if docker buildx imagetools inspect ghcr.io/hutch79/ci-runner-images:base | grep -q "linux/amd64\|linux/arm64"; then
-              echo "✅ Base image has expected platforms"
-              break
-            else
-              echo "❌ Base image manifest exists but missing expected platforms"
-            fi
-          else
-            echo "❌ Base image manifest not yet available"
+        MAX_ATTEMPTS=18
+        SLEEP_INTERVAL=10
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "Attempt $i/$MAX_ATTEMPTS: Checking base image..."
+          
+          # Try both with and without release tag depending on what was published
+          FOUND=false
+          
+          # Check for the dated tag first (should always exist)
+          if docker pull ghcr.io/hutch79/ci-runner-images:base-$(date +'%Y%m%d') 2>&1 | grep -q "Downloaded newer image\|Status: Downloaded\|Status: Image is up to date"; then
+            echo "✅ Base image (dated tag) is available"
+            FOUND=true
           fi
-          if [ $i -lt 7 ]; then
-            echo "Retrying in 10 seconds... ($i/7)"
-            sleep 10
+          
+          # Also check release tag
+          if docker pull ghcr.io/hutch79/ci-runner-images:base 2>&1 | grep -q "Downloaded newer image\|Status: Downloaded\|Status: Image is up to date"; then
+            echo "✅ Base image (release tag) is available"
+            FOUND=true
+          fi
+          
+          if [ "$FOUND" = true ]; then
+            echo "✅ Base image is ready for dependent builds"
+            break
+          fi
+          
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "Base image not ready yet, retrying in ${SLEEP_INTERVAL}s..."
+            sleep $SLEEP_INTERVAL
           fi
         done
-        if [ $i -eq 7 ]; then
-          echo "❌ Base image manifest still not available after 1 minute"
+        
+        if [ $i -eq $MAX_ATTEMPTS ]; then
+          echo "❌ Base image still not available after $((MAX_ATTEMPTS * SLEEP_INTERVAL)) seconds"
           exit 1
         fi
       shell: bash
