@@ -103,6 +103,13 @@ jobs:
       contents: read
       packages: read
     steps:
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Generate summary
       run: |
         DATE=$(date +'%Y%m%d')
@@ -145,8 +152,16 @@ jobs:
 
           if [ "$job_result" = "success" ]; then
             job_status="✅ Success"
-            # Try to get image size (will be N/A if pull fails)
-            IMAGE_SIZE="Unknown"
+            # Get image size from registry
+            IMAGE_SIZE=$(docker manifest inspect "$dated_tag" 2>/dev/null | jq -r '.config.size // 0' 2>/dev/null || echo "Unknown")
+            if [ "$IMAGE_SIZE" = "0" ] || [ "$IMAGE_SIZE" = "Unknown" ]; then
+              IMAGE_SIZE="Unknown"
+            else
+              # Convert bytes to human readable format
+              if command -v numfmt >/dev/null 2>&1; then
+                IMAGE_SIZE=$(echo "$IMAGE_SIZE" | numfmt --to=iec-i --suffix=B)
+              fi
+            fi
           else
             job_status="❌ Failed ($job_result)"
             IMAGE_SIZE="N/A"
