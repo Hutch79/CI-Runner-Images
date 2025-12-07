@@ -42,7 +42,7 @@ jobs:
       id: find-images
       run: |
         # Find all directories in images/ that contain a Dockerfile
-        IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
+        IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort | tr '\n' ' ')
         echo "images=$IMAGES" >> $GITHUB_OUTPUT
         echo "Found images: $IMAGES"
 
@@ -51,7 +51,10 @@ jobs:
         DATE="${{ steps.date.outputs.date }}"
         RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
 
-        for image_dir in ${{ steps.find-images.outputs.images }}; do
+        # Read images from the output (space-separated)
+        IMAGES="${{ steps.find-images.outputs.images }}"
+
+        for image_dir in $IMAGES; do
           # Extract folder name (e.g., "dotnet-10" from "images/dotnet-10")
           folder_name=$(basename "$image_dir")
 
@@ -89,7 +92,10 @@ jobs:
         echo "| Image | Dated Tag | Release Tag |" >> $GITHUB_STEP_SUMMARY
         echo "|-------|-----------|-------------|" >> $GITHUB_STEP_SUMMARY
 
-        for image_dir in ${{ steps.find-images.outputs.images }}; do
+        # Read images from the output (space-separated)
+        IMAGES="${{ steps.find-images.outputs.images }}"
+
+        for image_dir in $IMAGES; do
           folder_name=$(basename "$image_dir")
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
