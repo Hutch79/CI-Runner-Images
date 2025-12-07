@@ -75,7 +75,7 @@ runs:
         fi
         
         docker buildx build \
-          --platform linux/amd64,linux/arm64 \
+          --platform linux/amd64 \
           $BUILD_TAGS \
           $CACHE_OPTIONS \
           --push \
