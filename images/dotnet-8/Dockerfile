@@ -3,14 +3,14 @@
 FROM ghcr.io/hutch79/ci-cd-base:main
 
 # Install .NET 8 SDK for build and test tooling
+USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-    software-properties-common \
- && add-apt-repository ppa:dotnet/backports -y \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-    dotnet-sdk-8.0 \
+    curl \
+ && curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 8.0 --install-dir /usr/share/dotnet \
+ && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
  && rm -rf /var/lib/apt/lists/*
+USER runner
 
 # Set .NET environment variables
 ENV DOTNET_ROOT=/usr/share/dotnet

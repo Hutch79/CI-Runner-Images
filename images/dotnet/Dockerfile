@@ -4,16 +4,20 @@
 FROM ghcr.io/hutch79/ci-cd-base:main
 
 # Install multiple .NET SDK versions for build and test tooling
+# Using .NET install script for reliable, up-to-date installations
+USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-    software-properties-common \
- && add-apt-repository ppa:dotnet/backports -y \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-    dotnet-sdk-8.0 \
-    dotnet-sdk-9.0 \
-    dotnet-sdk-10.0 \
+    curl \
+ && curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
+ && chmod +x dotnet-install.sh \
+ && ./dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet \
+ && ./dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet \
+ && ./dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
+ && rm dotnet-install.sh \
+ && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
  && rm -rf /var/lib/apt/lists/*
+USER runner
 
 # Set .NET environment variables
 ENV DOTNET_ROOT=/usr/share/dotnet
