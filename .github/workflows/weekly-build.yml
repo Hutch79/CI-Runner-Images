@@ -68,6 +68,7 @@ jobs:
     needs: [discover-images, build-base]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include: ${{ fromJson(needs.discover-images.outputs.matrix) }}
     permissions:
@@ -77,6 +78,31 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Wait for base image to be available
+      run: |
+        echo "Waiting for base image to be available..."
+        for i in {1..7}; do
+          if docker buildx imagetools inspect ghcr.io/hutch79/ci-runner-images:base >/dev/null 2>&1; then
+            echo "Base image manifest is available"
+            break
+          else
+            echo "Base image manifest not yet available, retrying in 10 seconds... ($i/7)"
+            sleep 10
+          fi
+        done
+        if [ $i -eq 7 ]; then
+          echo "Base image manifest still not available after 1 minute"
+          exit 1
+        fi
+      shell: bash
 
     - name: Build and push image
       uses: ./.github/actions/ci-image-builder
@@ -129,22 +155,18 @@ jobs:
           dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
           release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
 
-          # Pull the image to get its size
-          echo "Pulling image: $dated_tag"
+          # Check if this specific job succeeded by trying to pull the image
           if docker pull "$dated_tag" 2>/dev/null; then
+            job_status="✅ Success"
             # Get image size in human readable format
             IMAGE_SIZE=$(docker images "$dated_tag" --format "table {{.Size}}" | tail -n 1)
             if [ -z "$IMAGE_SIZE" ] || [ "$IMAGE_SIZE" = "<none>" ]; then
               IMAGE_SIZE="Unknown"
             fi
           else
-            IMAGE_SIZE="Pull failed"
+            job_status="❌ Failed"
+            IMAGE_SIZE="N/A"
           fi
-
-          # Check if this specific job succeeded
-          job_status="✅ Success"
-          # Note: In a real implementation, you'd need to check individual job statuses
-          # For now, we'll assume success if the summary job runs
 
           if [ "$RELEASE_TAG" = "true" ]; then
             echo "| $folder_name | $IMAGE_SIZE | \`$dated_tag\` | \`$release_tag\` | $job_status |" >> $GITHUB_STEP_SUMMARY
