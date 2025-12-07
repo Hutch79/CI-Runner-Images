@@ -11,6 +11,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         include: ${{ fromJson(inputs.changed-images) }}
@@ -26,6 +27,13 @@ jobs:
     - name: Build image for validation
       run: |
         IMAGE_DIR="${{ matrix.image }}"
+        
+        # Fail early if image is empty
+        if [ -z "$IMAGE_DIR" ] || [ -z "$(echo "$IMAGE_DIR" | xargs)" ]; then
+          echo "❌ ERROR: Image directory is empty"
+          exit 1
+        fi
+        
         FOLDER_NAME=$(basename "$IMAGE_DIR")
 
         echo "=== Building $FOLDER_NAME for validation ==="
