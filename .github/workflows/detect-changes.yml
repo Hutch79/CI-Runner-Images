@@ -29,7 +29,8 @@ jobs:
         CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
 
         # Find image directories that have changes
-        CHANGED_IMAGES=$(echo "$CHANGED_FILES" | grep '^images/' | cut -d'/' -f2 | sort | uniq)
+        # Normalize to full image directory paths like "images/base" or "images/dotnet-8"
+        CHANGED_IMAGES=$(echo "$CHANGED_FILES" | grep '^images/' | awk -F/ '{print $1"/"$2}' | sort -u)
 
         # Check if base image changed (affects all other images)
         BASE_CHANGED=$(echo "$CHANGED_FILES" | grep '^images/base/' | wc -l)
@@ -39,7 +40,7 @@ jobs:
           ALL_IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
           CHANGED_IMAGES=$(echo "$ALL_IMAGES" | tr '\n' ' ')
         else
-          # Only build images that actually changed
+          # Only build images that actually changed (already normalized to images/<name>)
           CHANGED_IMAGES=$(echo "$CHANGED_IMAGES" | tr '\n' ' ')
         fi
 
@@ -48,7 +49,7 @@ jobs:
         if [ -n "$CHANGED_IMAGES" ]; then
           echo "has-changes=true" >> $GITHUB_OUTPUT
           # Create JSON array for matrix - convert space-separated to JSON array
-          # Filter out empty entries and trim whitespace
+          # Each entry will be an object with key "image" and value like "images/base"
           MATRIX_JSON=$(echo "$CHANGED_IMAGES" | xargs -n1 | grep -v '^$' | sort -u | jq -R . | jq -s -c 'map(select(length > 0)) | map({image: .})')
           echo "changed-images=$MATRIX_JSON" >> $GITHUB_OUTPUT
         else

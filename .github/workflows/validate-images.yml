@@ -26,7 +26,8 @@ jobs:
 
     - name: Build image for validation
       run: |
-        IMAGE_DIR="images/${{ matrix.image }}"
+        # matrix.image is expected to be a full path like "images/<name>"
+        IMAGE_DIR="${{ matrix.image }}"
         
         # Fail early if image is empty
         if [ -z "${{ matrix.image }}" ] || [ -z "$(echo "${{ matrix.image }}" | xargs)" ]; then
@@ -48,7 +49,8 @@ jobs:
 
     - name: Verify image functionality
       run: |
-        IMAGE_DIR="images/${{ matrix.image }}"
+        # matrix.image is a full path like "images/<name>"
+        IMAGE_DIR="${{ matrix.image }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
         IMAGE_TAG="test-$FOLDER_NAME:pr-${{ github.event.number }}"
 
