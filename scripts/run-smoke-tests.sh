@@ -89,9 +89,9 @@ done
 # Image-specific tests from config
 if [ -f "$CONFIG_FILE" ]; then
     echo "=== Image-Specific Tests ==="
-    # Assume yq is installed or use python to parse YAML
-    # For simplicity, use python3 -c to parse YAML
-    python3 -c "
+    # Try python3 first, then fallback to bash parsing
+    if command -v python3 &> /dev/null; then
+        python3 -c "
 import yaml
 import sys
 with open('$CONFIG_FILE') as f:
@@ -99,9 +99,47 @@ with open('$CONFIG_FILE') as f:
     for test in config:
         print(f'TEST:{test[\"name\"]}:{test[\"command\"]}:{test.get(\"expected_contains\", \"\")}:{test.get(\"expected_matches\", \"\")}:{test.get(\"expected_version\", \"\")}')
 " | while IFS=':' read -r _ name cmd contains matches version; do
-        output=$(run_in_container "$cmd" || echo "Command failed")
-        validate_output "$name" "$output" "$contains" "$matches" "$version" || true
-    done
+            output=$(run_in_container "$cmd" || echo "Command failed")
+            validate_output "$name" "$output" "$contains" "$matches" "$version" || true
+        done
+    else
+        # Bash fallback for YAML parsing
+        echo "Warning: python3 not available, using basic YAML parser"
+        current_name=""
+        current_cmd=""
+        current_contains=""
+        current_matches=""
+        current_version=""
+        while IFS= read -r line; do
+            # Remove leading/trailing whitespace
+            line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [[ $line == name:* ]]; then
+                # Process previous test if complete
+                if [ -n "$current_name" ] && [ -n "$current_cmd" ]; then
+                    output=$(run_in_container "$current_cmd" || echo "Command failed")
+                    validate_output "$current_name" "$output" "$current_contains" "$current_matches" "$current_version" || true
+                fi
+                current_name=$(echo "$line" | sed 's/name:[[:space:]]*//')
+                current_cmd=""
+                current_contains=""
+                current_matches=""
+                current_version=""
+            elif [[ $line == command:* ]]; then
+                current_cmd=$(echo "$line" | sed 's/command:[[:space:]]*//')
+            elif [[ $line == expected_contains:* ]]; then
+                current_contains=$(echo "$line" | sed 's/expected_contains:[[:space:]]*//')
+            elif [[ $line == expected_matches:* ]]; then
+                current_matches=$(echo "$line" | sed 's/expected_matches:[[:space:]]*//')
+            elif [[ $line == expected_version:* ]]; then
+                current_version=$(echo "$line" | sed 's/expected_version:[[:space:]]*//')
+            fi
+        done < "$CONFIG_FILE"
+        # Process the last test
+        if [ -n "$current_name" ] && [ -n "$current_cmd" ]; then
+            output=$(run_in_container "$current_cmd" || echo "Command failed")
+            validate_output "$current_name" "$output" "$current_contains" "$current_matches" "$current_version" || true
+        fi
+    fi
 else
     echo "⚠️  Warning: No config file found at $CONFIG_FILE. Skipping image-specific tests."
 fi

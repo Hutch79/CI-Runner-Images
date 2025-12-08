@@ -1,0 +1,17 @@
+{
+  "name": "node-20-demo",
+  "version": "1.0.0",
+  "description": "Demo Node.js 20 application for CI testing",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"No tests specified\" && exit 0",
+    "build": "echo \"No build step required\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

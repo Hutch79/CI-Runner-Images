@@ -1,0 +1,17 @@
+# Node.js 24 Dockerfile for CI/CD jobs
+# Uses published base image from GHCR
+FROM ghcr.io/hutch79/ci-runner-images:base
+
+# Ensure we have the correct Node.js 24 installation
+USER root
+RUN apt-get update \
+ && apt-get remove -y nodejs npm \
+ && apt-get autoremove -y \
+ && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && npm install -g npm@latest \
+ && rm -rf /var/lib/apt/lists/*
+USER runner
+
+# Verify installation
+RUN node --version && npm --version
