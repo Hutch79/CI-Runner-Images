@@ -4,7 +4,7 @@
 
 - name: "Check Node.js Version"
   command: "node --version"
-  expected_matches: "^v\\d+\\."
+  expected_matches: "^v[0-9]+\\."
 
 - name: "Check Curl Version"
   command: "curl --version"
