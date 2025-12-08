@@ -8,6 +8,8 @@ CONFIG_FILE="$IMAGE_DIR/smoke-tests.yml"
 
 echo "Running smoke tests for $FOLDER_NAME (image: $IMAGE_TAG)"
 
+failed_tests=""
+
 # Function to run a command in the container and capture output
 run_in_container() {
     local cmd="$1"
@@ -25,17 +27,19 @@ validate_output() {
     echo "Test: $name"
     echo "Output: $output"
 
+    local failed=false
+
     if [ -n "$expected_contains" ]; then
         if ! echo "$output" | grep -q "$expected_contains"; then
             echo "❌ FAIL: Expected to contain '$expected_contains'"
-            return 1
+            failed=true
         fi
     fi
 
     if [ -n "$expected_matches" ]; then
         if ! echo "$output" | grep -E -q "$expected_matches"; then
             echo "❌ FAIL: Expected to match regex '$expected_matches'"
-            return 1
+            failed=true
         fi
     fi
 
@@ -47,19 +51,24 @@ validate_output() {
                 # For multi, check if multiple versions are installed
                 if ! echo "$output" | grep -q "$expected_version"; then
                     echo "❌ FAIL: Expected .NET $expected_version in output"
-                    return 1
+                    failed=true
                 fi
             else
                 if ! echo "$output" | grep -E -q "^$major\."; then
                     echo "❌ FAIL: Expected .NET major version $major"
-                    return 1
+                    failed=true
                 fi
             fi
         fi
     fi
 
-    echo "✅ PASS"
-    return 0
+    if [ "$failed" = false ]; then
+        echo "✅ PASS"
+        return 0
+    else
+        failed_tests="$failed_tests$name; "
+        return 1
+    fi
 }
 
 # General tests for base functionality (always run)
@@ -74,9 +83,7 @@ GENERAL_TESTS=(
 for test in "${GENERAL_TESTS[@]}"; do
     IFS=':' read -r name cmd expect <<< "$test"
     output=$(run_in_container "$cmd" || echo "Command failed")
-    if ! validate_output "$name" "$output" "$expect"; then
-        exit 1
-    fi
+    validate_output "$name" "$output" "$expect" || true
 done
 
 # Image-specific tests from config
@@ -93,12 +100,16 @@ with open('$CONFIG_FILE') as f:
         print(f'TEST:{test[\"name\"]}:{test[\"command\"]}:{test.get(\"expected_contains\", \"\")}:{test.get(\"expected_matches\", \"\")}:{test.get(\"expected_version\", \"\")}')
 " | while IFS=':' read -r _ name cmd contains matches version; do
         output=$(run_in_container "$cmd" || echo "Command failed")
-        if ! validate_output "$name" "$output" "$contains" "$matches" "$version"; then
-            exit 1
-        fi
+        validate_output "$name" "$output" "$contains" "$matches" "$version" || true
     done
 else
     echo "⚠️  Warning: No config file found at $CONFIG_FILE. Skipping image-specific tests."
 fi
 
-echo "All smoke tests passed for $FOLDER_NAME!"
+if [ -n "$failed_tests" ]; then
+    echo "Failed tests: ${failed_tests% }"
+    echo "failed-tests=${failed_tests% }" >> $GITHUB_OUTPUT
+    exit 1
+else
+    echo "All smoke tests passed for $FOLDER_NAME!"
+fi

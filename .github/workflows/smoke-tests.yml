@@ -67,15 +67,14 @@ jobs:
         ./scripts/run-smoke-tests.sh "smoke-test-$FOLDER_NAME" "$IMAGE_DIR"
 
     - name: Add to summary
-      if: always()
+      if: steps.run-tests.outcome == 'failure'
       run: |
         IMAGE_DIR="${{ matrix.image }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
-        RESULT="${{ steps.run-tests.outcome }}"
+        FAILED_TESTS="${{ steps.run-tests.outputs.failed-tests }}"
         echo "### Smoke Test: $FOLDER_NAME" >> $GITHUB_STEP_SUMMARY
-        if [ "$RESULT" = "success" ]; then
-          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+        echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+        if [ -n "$FAILED_TESTS" ]; then
+          echo "Failed tests: $FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
