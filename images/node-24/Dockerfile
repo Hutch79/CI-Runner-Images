@@ -1,5 +1,5 @@
 # Node.js 24 Dockerfile for CI/CD jobs
-# Uses published base image from GHCR (which has Node.js 24)
+# Uses published base image from GHCR
 FROM ghcr.io/hutch79/ci-runner-images:base
 
 # Ensure we have the correct Node.js 24 installation
