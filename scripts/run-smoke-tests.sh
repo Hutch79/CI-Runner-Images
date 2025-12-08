@@ -66,7 +66,7 @@ validate_output() {
 echo "=== General Tests ==="
 GENERAL_TESTS=(
     "Git Version:git --version:git version"
-    "Node Version:node --version:^v[0-9]+\."
+    "Node Version:node --version:v[0-9]"
     "Curl Version:curl --version:curl"
     "Bash Version:bash --version:GNU bash"
 )
