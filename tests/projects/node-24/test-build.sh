@@ -40,6 +40,12 @@ APP_PID=$!
 # Wait a moment for the app to start
 sleep 3
 
+# Check if the application process is still running
+if ! kill -0 $APP_PID 2>/dev/null; then
+    echo "❌ Application failed to start"
+    exit 1
+fi
+
 # Check if the app is responding
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
     echo "✅ Application is responding correctly"
