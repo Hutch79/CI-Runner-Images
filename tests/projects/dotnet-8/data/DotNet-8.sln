@@ -1,0 +1,15 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotNet-8.Demo", "src\DotNet-8.Demo\DotNet-8.Demo.csproj", "{0ECF3C8E-8E3D-40E6-B1AC-0067EB3720F4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0ECF3C8E-8E3D-40E6-B1AC-0067EB3720F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0ECF3C8E-8E3D-40E6-B1AC-0067EB3720F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0ECF3C8E-8E3D-40E6-B1AC-0067EB3720F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0ECF3C8E-8E3D-40E6-B1AC-0067EB3720F4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

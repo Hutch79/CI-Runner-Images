@@ -1,0 +1,82 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'images/**'
+      - 'tests/**'
+      - '.github/workflows/integration-tests.yml'
+      - 'scripts/run-integration-tests.sh'
+      - 'config.yml'
+  workflow_dispatch:
+    inputs:
+      run_all:
+        description: 'Run tests on all images (default: false, only changed)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  discover-images:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.find.outputs.images }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Find image directories
+      id: find
+      run: |
+        # Find all directories in images/ that contain a Dockerfile
+        IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
+        echo "Found images: $IMAGES"
+        # Output as JSON array of objects
+        IMAGES_JSON=$(echo "$IMAGES" | jq -R -s 'split("\n") | map(select(. != "")) | map({image: .})')
+        echo "images<<EOF" >> $GITHUB_OUTPUT
+        echo "$IMAGES_JSON" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+  detect-changes:
+    if: github.event_name == 'pull_request' && !inputs.run_all
+    uses: ./.github/workflows/detect-changes.yml
+    secrets: inherit
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [discover-images, detect-changes]
+    if: always() && (needs.detect-changes.result == 'success' || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.detect-changes.outputs.changed-images || needs.discover-images.outputs.images) }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build image
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        docker build -t integration-test-$FOLDER_NAME "$IMAGE_DIR"
+
+    - name: Run integration tests
+      id: run-tests
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        ./scripts/run-integration-tests.sh "integration-test-$FOLDER_NAME" "$IMAGE_DIR"
+
+    - name: Add to summary
+      if: steps.run-tests.outcome == 'failure'
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        FAILED_TESTS="${{ steps.run-tests.outputs.failed-tests }}"
+        echo "### Integration Test: $FOLDER_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+        if [ -n "$FAILED_TESTS" ]; then
+          echo "Failed tests: $FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY

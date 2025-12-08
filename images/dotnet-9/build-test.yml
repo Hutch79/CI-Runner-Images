@@ -1,0 +1,2 @@
+- project: dotnet-9
+  should_build: true

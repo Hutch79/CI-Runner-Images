@@ -1,0 +1,6 @@
+- project: dotnet-8
+  should_build: true
+- project: dotnet-9
+  should_build: true
+- project: dotnet-10
+  should_build: true
