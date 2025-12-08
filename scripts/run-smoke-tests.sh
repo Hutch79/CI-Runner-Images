@@ -109,7 +109,10 @@ fi
 if [ -n "$failed_tests" ]; then
     echo "Failed tests: ${failed_tests% }"
     echo "failed-tests=${failed_tests% }" >> $GITHUB_OUTPUT
+    # Write results to file for other jobs to read
+    echo "$FOLDER_NAME:failed" >> smoke-test-results.txt
     exit 1
 else
     echo "All smoke tests passed for $FOLDER_NAME!"
+    echo "$FOLDER_NAME:passed" >> smoke-test-results.txt
 fi

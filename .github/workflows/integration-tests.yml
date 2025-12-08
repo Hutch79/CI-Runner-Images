@@ -80,3 +80,11 @@ jobs:
           echo "Failed tests: $FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-result-${{ matrix.image }}
+        path: integration-test-results.txt
+        retention-days: 1

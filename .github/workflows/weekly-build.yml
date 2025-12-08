@@ -49,8 +49,22 @@ jobs:
         echo "images=$ALL_IMAGES_SPACE" >> $GITHUB_OUTPUT
         echo "dotnet-images=$DOTNET_IMAGES_SPACE" >> $GITHUB_OUTPUT
 
-  build-base:
+  smoke-tests:
     needs: discover-images
+    uses: ./.github/workflows/smoke-tests.yml
+    with:
+      run_all: true
+    secrets: inherit
+
+  integration-tests:
+    needs: smoke-tests
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      run_all: true
+    secrets: inherit
+
+  build-base:
+    needs: [discover-images, integration-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,6 +72,34 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Download smoke test results for base
+      uses: actions/download-artifact@v4
+      with:
+        name: smoke-test-result-images/base
+        path: /tmp/smoke-results
+
+    - name: Download integration test results for base
+      uses: actions/download-artifact@v4
+      with:
+        name: integration-test-result-images/base
+        path: /tmp/integration-results
+
+    - name: Check base image test results
+      run: |
+        # Check if base passed smoke tests
+        if ! grep -q "base:passed" /tmp/smoke-results/smoke-test-results.txt; then
+          echo "Base image failed smoke tests, skipping build"
+          exit 1
+        fi
+        
+        # Check if base passed integration tests
+        if ! grep -q "base:passed" /tmp/integration-results/integration-test-results.txt; then
+          echo "Base image failed integration tests, skipping build"
+          exit 1
+        fi
+        
+        echo "Base image passed all tests, proceeding with build"
 
     - name: Build and push base image
       uses: ./.github/actions/ci-image-builder
@@ -71,7 +113,7 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-publish:
-    needs: [discover-images, build-base]
+    needs: [discover-images, build-base, integration-tests]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,6 +125,37 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Download smoke test results
+      uses: actions/download-artifact@v4
+      with:
+        name: smoke-test-result-${{ matrix.image }}
+        path: /tmp/smoke-results
+
+    - name: Download integration test results
+      uses: actions/download-artifact@v4
+      with:
+        name: integration-test-result-${{ matrix.image }}
+        path: /tmp/integration-results
+
+    - name: Check image test results
+      run: |
+        IMAGE_DIR="${{ matrix.image }}"
+        FOLDER_NAME=$(basename "$IMAGE_DIR")
+        
+        # Check if image passed smoke tests
+        if ! grep -q "$FOLDER_NAME:passed" /tmp/smoke-results/smoke-test-results.txt; then
+          echo "$FOLDER_NAME failed smoke tests, skipping build"
+          exit 1
+        fi
+        
+        # Check if image passed integration tests
+        if ! grep -q "$FOLDER_NAME:passed" /tmp/integration-results/integration-test-results.txt; then
+          echo "$FOLDER_NAME failed integration tests, skipping build"
+          exit 1
+        fi
+        
+        echo "$FOLDER_NAME passed all tests, proceeding with build"
 
     - name: Build and push image
       uses: ./.github/actions/ci-image-builder
@@ -96,7 +169,7 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
   summary:
-    needs: [discover-images, build-base, build-and-publish]
+    needs: [discover-images, build-base, build-and-publish, smoke-tests, integration-tests]
     runs-on: ubuntu-latest
     if: always()
     permissions:
