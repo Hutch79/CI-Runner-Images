@@ -9,12 +9,12 @@ on:
       publish_release_tags:
         description: 'Also publish release tags (without date)'
         required: false
-        default: 'true'
+        default: true
         type: boolean
       use_cache:
         description: 'Use build cache for faster builds'
         required: false
-        default: 'true'
+        default: true
         type: boolean
 
 jobs:

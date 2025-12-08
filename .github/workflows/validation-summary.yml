@@ -45,7 +45,14 @@ jobs:
         if [ "${{ inputs.has-changes }}" = "true" ]; then
           echo "### 📦 Images Built & Tested" >> $GITHUB_STEP_SUMMARY
           CHANGED_IMAGES="${{ inputs.changed-images }}"
-          echo "$CHANGED_IMAGES" | jq -r '.[] | "- \(.image)"' >> $GITHUB_STEP_SUMMARY
+          # Ensure CHANGED_IMAGES is valid JSON; if not, normalize space/newline-separated entries
+          if echo "$CHANGED_IMAGES" | jq -e . >/dev/null 2>&1; then
+            echo "$CHANGED_IMAGES" | jq -r '.[] | "- \(.image)"' >> $GITHUB_STEP_SUMMARY
+          else
+            # Try to split by whitespace/newlines and convert to JSON array of {image: "..."}
+            NORMALIZED_JSON=$(echo "$CHANGED_IMAGES" | tr ' ' '\n' | xargs -n1 | jq -R . | jq -s -c 'map(select(length > 0)) | map({image: .})')
+            echo "$NORMALIZED_JSON" | jq -r '.[] | "- \(.image)"' >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
         else
           echo "### 📦 No Image Changes Detected" >> $GITHUB_STEP_SUMMARY
