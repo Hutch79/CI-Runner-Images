@@ -31,7 +31,7 @@ jobs:
         IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
         echo "Found images: $IMAGES"
         # Output as JSON array of objects
-        IMAGES_JSON=$(echo "$IMAGES" | jq -R . | jq -s 'map({image: .})')
+        IMAGES_JSON=$(echo "$IMAGES" | jq -R -s 'split("\n") | map(select(. != "")) | map({image: .})')
         echo "images=$IMAGES_JSON" >> $GITHUB_OUTPUT
 
   detect-changes:
