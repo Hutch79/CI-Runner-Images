@@ -1,7 +1,8 @@
 # Multi-Version .NET SDK Dockerfile for CI/CD jobs
 # Contains .NET 8, 9, and 10 SDKs for flexible CI/CD pipelines
-# Uses published base image from GHCR
-FROM ghcr.io/hutch79/ci-runner-images:base
+# Base image is configured in config.yml (base_images.runner)
+ARG BASE_IMAGE=ghcr.io/hutch79/ci-runner-images:base
+FROM ${BASE_IMAGE}
 
 # Install multiple .NET SDK versions for build and test tooling
 # Using .NET install script for reliable, up-to-date installations

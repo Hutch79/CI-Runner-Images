@@ -30,13 +30,26 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Load configuration
+      id: config
+      run: |
+        # Load values from config.yml
+        echo "registry=$(bash scripts/config-loader.sh get registry.url)" >> $GITHUB_OUTPUT
+        echo "owner=$(bash scripts/config-loader.sh get registry.owner)" >> $GITHUB_OUTPUT
+        echo "repository=$(bash scripts/config-loader.sh get registry.repository)" >> $GITHUB_OUTPUT
+        echo "base_ubuntu=$(bash scripts/config-loader.sh base-ubuntu)" >> $GITHUB_OUTPUT
+        echo "base_runner=$(bash scripts/config-loader.sh base-runner)" >> $GITHUB_OUTPUT
+        echo "buildx_version=$(bash scripts/config-loader.sh get actions.setup-buildx)" >> $GITHUB_OUTPUT
+        echo "login_version=$(bash scripts/config-loader.sh get actions.login-action)" >> $GITHUB_OUTPUT
+      shell: bash
+
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@${{ steps.config.outputs.buildx_version }}
 
     - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@${{ steps.config.outputs.login_version }}
       with:
-        registry: ${{ inputs.registry }}
+        registry: ${{ steps.config.outputs.registry }}
         username: ${{ github.actor }}
         password: ${{ inputs.github-token }}
 
@@ -53,6 +66,11 @@ runs:
         IMAGE_DIR="${{ inputs.image-dir }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
         CACHE_KEY="docker-$FOLDER_NAME-${{ hashFiles(format('{0}/**', inputs.image-dir)) }}"
+        
+        # Use config for registry path
+        REGISTRY="${{ steps.config.outputs.registry }}"
+        OWNER="${{ steps.config.outputs.owner }}"
+        REPO="${{ steps.config.outputs.repository }}"
 
         echo "=== Building $FOLDER_NAME from $IMAGE_DIR ==="
 
@@ -63,10 +81,17 @@ runs:
           CACHE_OPTIONS="--cache-from type=gha,scope=$CACHE_KEY --cache-to type=gha,mode=max,scope=$CACHE_KEY"
         fi
 
+        # Pass base images as build args
+        BUILD_ARGS="--build-arg BASE_IMAGE=${{ steps.config.outputs.base_runner }}"
+        if [ "$FOLDER_NAME" = "base" ]; then
+          BUILD_ARGS="--build-arg BASE_IMAGE=${{ steps.config.outputs.base_ubuntu }}"
+        fi
+
         # Build and push with date tag
         docker buildx build \
           --platform linux/amd64 \
-          --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE" \
+          --tag "$REGISTRY/$OWNER/$REPO:$FOLDER_NAME-$DATE" \
+          $BUILD_ARGS \
           $CACHE_OPTIONS \
           --push \
           "$IMAGE_DIR"
@@ -75,14 +100,15 @@ runs:
         if [ "$RELEASE_TAG" = "true" ]; then
           docker buildx build \
             --platform linux/amd64 \
-            --tag "${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME" \
+            --tag "$REGISTRY/$OWNER/$REPO:$FOLDER_NAME" \
+            $BUILD_ARGS \
             $CACHE_OPTIONS \
             --push \
             "$IMAGE_DIR"
         fi
 
-        echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME-$DATE"
+        echo "✅ Published: $REGISTRY/$OWNER/$REPO:$FOLDER_NAME-$DATE"
         if [ "$RELEASE_TAG" = "true" ]; then
-          echo "✅ Published: ${{ inputs.registry }}/${{ inputs.repository-owner }}/${{ inputs.repository-name }}:$FOLDER_NAME"
+          echo "✅ Published: $REGISTRY/$OWNER/$REPO:$FOLDER_NAME"
         fi
       shell: bash

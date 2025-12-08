@@ -35,8 +35,13 @@ jobs:
     outputs:
       images: ${{ steps.find.outputs.images }}
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Find image directories
       id: find
@@ -64,8 +69,13 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.detect-changes.outputs.changed-images || needs.discover-images.outputs.images) }}
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Build image
       run: |
