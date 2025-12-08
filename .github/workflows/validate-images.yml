@@ -26,10 +26,10 @@ jobs:
 
     - name: Build image for validation
       run: |
-        IMAGE_DIR="${{ matrix.image }}"
+        IMAGE_DIR="images/${{ matrix.image }}"
         
         # Fail early if image is empty
-        if [ -z "$IMAGE_DIR" ] || [ -z "$(echo "$IMAGE_DIR" | xargs)" ]; then
+        if [ -z "${{ matrix.image }}" ] || [ -z "$(echo "${{ matrix.image }}" | xargs)" ]; then
           echo "❌ ERROR: Image directory is empty"
           exit 1
         fi
@@ -48,7 +48,7 @@ jobs:
 
     - name: Verify image functionality
       run: |
-        IMAGE_DIR="${{ matrix.image }}"
+        IMAGE_DIR="images/${{ matrix.image }}"
         FOLDER_NAME=$(basename "$IMAGE_DIR")
         IMAGE_TAG="test-$FOLDER_NAME:pr-${{ github.event.number }}"
 
@@ -56,7 +56,7 @@ jobs:
 
         docker run --rm "$IMAGE_TAG" echo "✅ Image runs successfully"
 
-        if [[ "$IMAGE_DIR" == *"dotnet"* ]]; then
+        if [[ "${{ matrix.image }}" == *"dotnet"* ]]; then
           echo "Checking .NET installation..."
           docker run --rm "$IMAGE_TAG" dotnet --version
         fi
