@@ -1,9 +1,11 @@
 # Minimal Dockerfile for CI/CD jobs (Ubuntu 24.04)
-FROM ubuntu:24.04
+# Base image is configured in config.yml (base_images.ubuntu)
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG NODE_MAJOR=24
+ARG NODE_MAJOR=20
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -11,6 +13,7 @@ RUN apt-get update \
     ca-certificates \
     curl \
     git \
+    libicu-dev \
     openssh-client \
     unzip \
     zip \

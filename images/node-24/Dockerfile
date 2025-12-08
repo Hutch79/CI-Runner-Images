@@ -1,6 +1,7 @@
 # Node.js 24 Dockerfile for CI/CD jobs
-# Uses published base image from GHCR
-FROM ghcr.io/hutch79/ci-runner-images:base
+# Base image is configured in config.yml (base_images.runner)
+ARG BASE_IMAGE=ghcr.io/hutch79/ci-runner-images:base
+FROM ${BASE_IMAGE}
 
 # Ensure we have the correct Node.js 24 installation
 USER root

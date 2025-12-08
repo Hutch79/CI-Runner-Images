@@ -25,8 +25,13 @@ jobs:
       matrix: ${{ steps.find-images.outputs.matrix }}
       dotnet-images: ${{ steps.find-images.outputs.dotnet-images }}
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Find image directories
       id: find-images
@@ -70,17 +75,23 @@ jobs:
       contents: read
       packages: write
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+        echo "download_version=$(bash scripts/config-loader.sh get actions.download-artifact)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Download smoke test results for base
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@${{ steps.config.outputs.download_version }}
       with:
         name: smoke-test-result-images-base
         path: /tmp/smoke-results
 
     - name: Download integration test results for base
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@${{ steps.config.outputs.download_version }}
       with:
         name: integration-test-result-images-base
         path: /tmp/integration-results
@@ -124,8 +135,14 @@ jobs:
       packages: write
 
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+        echo "download_version=$(bash scripts/config-loader.sh get actions.download-artifact)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Download smoke test results
       run: |
@@ -133,7 +150,7 @@ jobs:
         echo "ARTIFACT_NAME=smoke-test-result-$(echo "${{ matrix.image }}" | tr '/' '-')" >> $GITHUB_ENV
 
     - name: Download smoke test results (artifact)
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@${{ steps.config.outputs.download_version }}
       with:
         name: ${{ env.ARTIFACT_NAME }}
         path: /tmp/smoke-results
@@ -144,7 +161,7 @@ jobs:
         echo "ARTIFACT_NAME=integration-test-result-$(echo "${{ matrix.image }}" | tr '/' '-')" >> $GITHUB_ENV
 
     - name: Download integration test results (artifact)
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@${{ steps.config.outputs.download_version }}
       with:
         name: ${{ env.ARTIFACT_NAME }}
         path: /tmp/integration-results
@@ -187,10 +204,20 @@ jobs:
       contents: read
       packages: read
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+        echo "registry=$(bash scripts/config-loader.sh get registry.url)" >> $GITHUB_OUTPUT
+        echo "login_version=$(bash scripts/config-loader.sh get actions.login-action)" >> $GITHUB_OUTPUT
+
+    - name: Checkout repository
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
+
     - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@${{ steps.config.outputs.login_version }}
       with:
-        registry: ghcr.io
+        registry: ${{ steps.config.outputs.registry }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -198,6 +225,9 @@ jobs:
       run: |
         DATE=$(date +'%Y%m%d')
         RELEASE_TAG="${{ github.event.inputs.publish_release_tags == 'true' || github.event_name == 'schedule' }}"
+        
+        # Load registry path from config
+        REGISTRY_PATH=$(bash scripts/config-loader.sh registry-path)
         
         # Check overall workflow status
         BUILD_BASE_STATUS="${{ needs.build-base.result }}"
@@ -224,8 +254,8 @@ jobs:
 
         for image_dir in $IMAGES; do
           folder_name=$(basename "$image_dir")
-          dated_tag="ghcr.io/hutch79/ci-runner-images:$folder_name-$DATE"
-          release_tag="ghcr.io/hutch79/ci-runner-images:$folder_name"
+          dated_tag="$REGISTRY_PATH:$folder_name-$DATE"
+          release_tag="$REGISTRY_PATH:$folder_name"
 
           # Determine job status based on which job handles this image
           if [ "$folder_name" = "base" ]; then

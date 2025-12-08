@@ -1,6 +1,7 @@
 # .NET 9 SDK Dockerfile for CI/CD jobs
-# Uses published base image from GHCR
-FROM ghcr.io/hutch79/ci-runner-images:base
+# Base image is configured in config.yml (base_images.runner)
+ARG BASE_IMAGE=ghcr.io/hutch79/ci-runner-images:base
+FROM ${BASE_IMAGE}
 
 # Install .NET 9 SDK for build and test tooling
 # Using .NET install script (more up-to-date than apt packages)

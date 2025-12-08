@@ -16,11 +16,17 @@ jobs:
       matrix:
         include: ${{ fromJson(inputs.changed-images) }}
     steps:
+    - name: Load configuration
+      id: config
+      run: |
+        echo "checkout_version=$(bash scripts/config-loader.sh get actions.checkout)" >> $GITHUB_OUTPUT
+        echo "buildx_version=$(bash scripts/config-loader.sh get actions.setup-buildx)" >> $GITHUB_OUTPUT
+
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@${{ steps.config.outputs.checkout_version }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@${{ steps.config.outputs.buildx_version }}
 
     - name: Build image for analysis
       run: |

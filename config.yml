@@ -1,0 +1,33 @@
+# Centralized Configuration for CI/CD Job Runners
+# This file contains shared configuration for base images, registry, and tooling versions
+
+# Container Registry Configuration
+registry:
+  url: ghcr.io
+  owner: hutch79
+  repository: ci-runner-images
+
+# Base Images
+base_images:
+  # Ubuntu base for the root 'base' image
+  ubuntu: ubuntu:24.04
+  
+  # Internal runner base image (used by all other images)
+  runner: ghcr.io/hutch79/ci-runner-images:base
+
+# Image Naming Convention
+# Format: <platform>-<content>
+# - platform: Operating system base (e.g., ubuntu)
+# - content: Folder name containing the Dockerfile
+naming:
+  platform: ubuntu
+
+# GitHub Actions Versions
+actions:
+  checkout: v4
+  setup-buildx: v3
+  login-action: v3
+  download-artifact: v4
+  upload-artifact: v4
+  trivy: "0.33.1"
+  codeql-upload-sarif: v4
