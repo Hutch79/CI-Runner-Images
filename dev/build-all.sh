@@ -10,6 +10,7 @@
 #   --skip-tests      Build only, don't run tests
 #   --skip-smoke      Skip smoke tests (but run integration tests)
 #   --skip-integration  Skip integration tests (but run smoke tests)
+#   --remote-base     Use remote base image instead of local (default: use local)
 #   --clean           Remove all local test images (prompts for confirmation)
 #   --help            Show this help message
 #
@@ -35,10 +36,11 @@
 # Examples:
 #   ./dev/build-all.sh                              # Show this help
 #   ./dev/build-all.sh base                         # Build only base image
-#   ./dev/build-all.sh dotnet-8 dotnet-9           # Build specific .NET versions
+#   ./dev/build-all.sh dotnet-8 dotnet-9           # Build specific .NET versions (uses local base)
 #   ./dev/build-all.sh --no-cache base              # Fresh rebuild of base
 #   ./dev/build-all.sh --skip-tests node            # Build all node images, no tests
-#   ./dev/build-all.sh dotnet --no-cache --skip-tests  # Fresh .NET builds, no tests
+#   ./dev/build-all.sh dotnet --no-cache --skip-tests  # Fresh .NET builds, no tests (uses local base)
+#   ./dev/build-all.sh dotnet-8 --remote-base       # Build with remote base image
 #   ./dev/build-all.sh --clean                      # Remove all local test images
 ##############################################################################
 
@@ -60,6 +62,7 @@ RUN_TESTS=true
 RUN_SMOKE=true
 RUN_INTEGRATION=true
 CLEAN_MODE=false
+USE_REMOTE_BASE=false
 REQUESTED_IMAGES=()
 
 # Tracking variables
@@ -197,6 +200,11 @@ while [[ $# -gt 0 ]]; do
             print_info "Integration tests disabled"
             shift
             ;;
+        --remote-base)
+            USE_REMOTE_BASE=true
+            print_info "Using remote base image"
+            shift
+            ;;
         --clean)
             CLEAN_MODE=true
             print_info "Clean mode enabled"
@@ -291,11 +299,18 @@ build_image() {
     if $is_base; then
         base_image=$(bash "$REPO_ROOT/scripts/config-loader.sh" base-ubuntu)
     else
-        # Use locally built base image for dependent images
-        if $BASE_BUILT; then
-            base_image="local-test-base:latest"
-        else
+        # For dependent images: try to use local base first, fall back to remote if needed
+        if $USE_REMOTE_BASE; then
+            # Explicitly requested remote base
             base_image=$(bash "$REPO_ROOT/scripts/config-loader.sh" base-runner)
+        else
+            # Try to use local base image if it exists, otherwise use remote
+            if docker image inspect local-test-base:latest > /dev/null 2>&1; then
+                base_image="local-test-base:latest"
+            else
+                print_warning "Local base image not found, using remote: $(bash "$REPO_ROOT/scripts/config-loader.sh" base-runner)"
+                base_image=$(bash "$REPO_ROOT/scripts/config-loader.sh" base-runner)
+            fi
         fi
     fi
     
@@ -388,8 +403,8 @@ clean_local_images() {
     print_header "Cleaning Local Test Images"
     
     # Find all local-test-* images
-    local images
-    mapfile -t images < <(docker images --filter "reference=local-test-*" --format "{{.Repository}}:{{.Tag}}" 2>/dev/null || echo "")
+    local images=()
+    mapfile -t images < <(docker images --filter "reference=local-test-*" --format "{{.Repository}}:{{.Tag}}" 2>/dev/null)
     
     if [[ ${#images[@]} -eq 0 ]]; then
         print_info "No local test images found to clean"
@@ -432,12 +447,13 @@ clean_local_images() {
     
     for image in "${images[@]}"; do
         print_info "Removing: $image"
+        
         if docker rmi "$image" > /dev/null 2>&1; then
             print_success "Removed: $image"
-            ((removed_count++))
+            removed_count=$((removed_count + 1))
         else
             print_error "Failed to remove: $image"
-            ((failed_count++))
+            failed_count=$((failed_count + 1))
         fi
     done
     
