@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG NODE_MAJOR=24
+ARG NODE_MAJOR=20
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
