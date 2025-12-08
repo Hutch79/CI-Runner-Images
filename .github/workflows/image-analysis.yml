@@ -24,10 +24,15 @@ jobs:
 
     - name: Build image for analysis
       run: |
+        # Normalize matrix.image to a path under images/
         IMAGE_DIR="${{ matrix.image }}"
+        if [[ "$IMAGE_DIR" != images/* ]]; then
+          IMAGE_DIR="images/$IMAGE_DIR"
+        fi
+
         FOLDER_NAME=$(basename "$IMAGE_DIR")
 
-        echo "Building $FOLDER_NAME for analysis..."
+        echo "Building $FOLDER_NAME for analysis... (context: $IMAGE_DIR)"
 
         docker buildx build \
           --platform linux/amd64 \

@@ -26,7 +26,7 @@ jobs:
     secrets: inherit
 
   security-scan:
-    needs: [detect-changes, build-images]
+    needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/security-scan.yml
     with:
@@ -34,7 +34,7 @@ jobs:
     secrets: inherit
 
   image-analysis:
-    needs: [detect-changes, build-images]
+    needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
     uses: ./.github/workflows/image-analysis.yml
     with:

@@ -26,8 +26,11 @@ jobs:
 
     - name: Build image for validation
       run: |
-        # matrix.image is expected to be a full path like "images/<name>"
+        # Normalize matrix.image to a path under images/ (accept both "dotnet-6" and "images/dotnet-6")
         IMAGE_DIR="${{ matrix.image }}"
+        if [[ "$IMAGE_DIR" != images/* ]]; then
+          IMAGE_DIR="images/$IMAGE_DIR"
+        fi
         
         # Fail early if image is empty
         if [ -z "${{ matrix.image }}" ] || [ -z "$(echo "${{ matrix.image }}" | xargs)" ]; then
