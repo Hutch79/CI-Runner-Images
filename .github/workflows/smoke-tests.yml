@@ -32,7 +32,9 @@ jobs:
         echo "Found images: $IMAGES"
         # Output as JSON array of objects
         IMAGES_JSON=$(echo "$IMAGES" | jq -R -s 'split("\n") | map(select(. != "")) | map({image: .})')
-        echo "images=$IMAGES_JSON" >> $GITHUB_OUTPUT
+        echo "images<<EOF" >> $GITHUB_OUTPUT
+        echo "$IMAGES_JSON" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
   detect-changes:
     if: github.event_name == 'pull_request' && !inputs.run_all
