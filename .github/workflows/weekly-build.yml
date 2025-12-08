@@ -115,6 +115,7 @@ jobs:
   build-and-publish:
     needs: [discover-images, build-base, integration-tests]
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         include: ${{ fromJson(needs.discover-images.outputs.matrix) }}
