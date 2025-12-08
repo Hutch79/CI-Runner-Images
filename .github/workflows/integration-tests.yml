@@ -16,6 +16,13 @@ on:
         required: false
         default: false
         type: boolean
+  workflow_call:
+    inputs:
+      run_all:
+        description: 'Run tests on all images (default: false, only changed)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   discover-images:
