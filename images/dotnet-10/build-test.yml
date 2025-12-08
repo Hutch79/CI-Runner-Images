@@ -1,2 +1,4 @@
+- project: base
+  should_build: true
 - project: dotnet-10
   should_build: true

@@ -1,0 +1,2 @@
+- project: base
+  should_build: true

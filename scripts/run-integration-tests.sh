@@ -71,7 +71,7 @@ if command -v yq &> /dev/null; then
     yq -o=json "$CONFIG_FILE" | jq -r '.[] | select(.project and .should_build) | "\(.project):\(.should_build)"' | while IFS=':' read -r project should_build; do
         validate_build_test "$project" "$should_build" || true
     done
-else
+elif command -v python3 &> /dev/null; then
     # Fallback to python3 if yq not available
     python3 -c "
 import yaml
@@ -87,6 +87,23 @@ with open('$CONFIG_FILE') as f:
 " | while IFS=':' read -r project should_build; do
     validate_build_test "$project" "$should_build" || true
 done
+else
+    # Simple bash fallback for basic YAML parsing
+    echo "Warning: Neither yq nor python3 available, using basic YAML parser"
+    while IFS= read -r line; do
+        # Remove leading/trailing whitespace
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ $line == project:* ]]; then
+            project=$(echo "$line" | sed 's/project:[[:space:]]*//')
+        elif [[ $line == should_build:* ]]; then
+            should_build=$(echo "$line" | sed 's/should_build:[[:space:]]*//')
+            if [ -n "$project" ] && [ -n "$should_build" ]; then
+                validate_build_test "$project" "$should_build" || true
+                project=""
+                should_build=""
+            fi
+        fi
+    done < "$CONFIG_FILE"
 fi
 
 if [ -n "$failed_tests" ]; then
