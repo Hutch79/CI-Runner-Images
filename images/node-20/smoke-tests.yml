@@ -1,0 +1,11 @@
+- name: "Check Node.js Version"
+  command: "node --version"
+  expected_matches: "^v20\\."
+
+- name: "Check npm Version"
+  command: "npm --version"
+  expected_contains: "."
+
+- name: "Check Node.js Architecture"
+  command: "node -e \"console.log(process.arch)\""
+  expected_contains: "x64"

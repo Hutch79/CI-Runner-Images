@@ -90,20 +90,26 @@ done
 else
     # Simple bash fallback for basic YAML parsing
     echo "Warning: Neither yq nor python3 available, using basic YAML parser"
+    current_project=""
+    current_should_build=""
     while IFS= read -r line; do
         # Remove leading/trailing whitespace
         line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [[ $line == project:* ]]; then
-            project=$(echo "$line" | sed 's/project:[[:space:]]*//')
-        elif [[ $line == should_build:* ]]; then
-            should_build=$(echo "$line" | sed 's/should_build:[[:space:]]*//')
-            if [ -n "$project" ] && [ -n "$should_build" ]; then
-                validate_build_test "$project" "$should_build" || true
-                project=""
-                should_build=""
+            # If we have a previous complete entry, process it
+            if [ -n "$current_project" ] && [ -n "$current_should_build" ]; then
+                validate_build_test "$current_project" "$current_should_build" || true
             fi
+            current_project=$(echo "$line" | sed 's/project:[[:space:]]*//')
+            current_should_build=""
+        elif [[ $line == should_build:* ]]; then
+            current_should_build=$(echo "$line" | sed 's/should_build:[[:space:]]*//')
         fi
     done < "$CONFIG_FILE"
+    # Process the last entry
+    if [ -n "$current_project" ] && [ -n "$current_should_build" ]; then
+        validate_build_test "$current_project" "$current_should_build" || true
+    fi
 fi
 
 if [ -n "$failed_tests" ]; then

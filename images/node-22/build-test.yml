@@ -1,0 +1,4 @@
+- project: base
+  should_build: true
+- project: node-22
+  should_build: true
