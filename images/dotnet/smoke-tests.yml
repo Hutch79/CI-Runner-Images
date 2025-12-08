@@ -1,0 +1,9 @@
+- name: "Check .NET Version"
+  command: "dotnet --version"
+  expected_version: "multi"
+
+- name: "Check .NET SDKs"
+  command: "dotnet --list-sdks"
+  expected_contains: "8."
+  expected_contains: "9."
+  expected_contains: "10."

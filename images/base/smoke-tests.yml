@@ -1,0 +1,15 @@
+- name: "Check Git Version"
+  command: "git --version"
+  expected_contains: "git version"
+
+- name: "Check Node.js Version"
+  command: "node --version"
+  expected_matches: "^v\\d+\\."
+
+- name: "Check Curl Version"
+  command: "curl --version"
+  expected_contains: "curl"
+
+- name: "Check Bash Version"
+  command: "bash --version"
+  expected_contains: "GNU bash"
