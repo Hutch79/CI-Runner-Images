@@ -30,8 +30,8 @@ jobs:
         # Find all directories in images/ that contain a Dockerfile
         IMAGES=$(find images -name "Dockerfile" -exec dirname {} \; | sort)
         echo "Found images: $IMAGES"
-        # Output as JSON array
-        IMAGES_JSON=$(echo "$IMAGES" | jq -R . | jq -s .)
+        # Output as JSON array of objects
+        IMAGES_JSON=$(echo "$IMAGES" | jq -R . | jq -s 'map({image: .})')
         echo "images=$IMAGES_JSON" >> $GITHUB_OUTPUT
 
   detect-changes:
@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ fromJson(needs.detect-changes.outputs.changed-images || needs.discover-images.outputs.images) }}
+        include: ${{ fromJson(needs.detect-changes.outputs.changed-images || needs.discover-images.outputs.images) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
