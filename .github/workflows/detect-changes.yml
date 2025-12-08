@@ -47,8 +47,9 @@ jobs:
 
         if [ -n "$CHANGED_IMAGES" ]; then
           echo "has-changes=true" >> $GITHUB_OUTPUT
-          # Create JSON array for matrix - trim and filter empty strings
-          MATRIX_JSON=$(echo "$CHANGED_IMAGES" | xargs -n1 | sort -u | jq -R -s -c '[.[] | select(length > 0)] | map({image: .})')
+          # Create JSON array for matrix - convert space-separated to JSON array
+          # Filter out empty entries and trim whitespace
+          MATRIX_JSON=$(echo "$CHANGED_IMAGES" | xargs -n1 | grep -v '^$' | sort -u | jq -R . | jq -s -c 'map(select(length > 0)) | map({image: .})')
           echo "changed-images=$MATRIX_JSON" >> $GITHUB_OUTPUT
         else
           echo "has-changes=false" >> $GITHUB_OUTPUT
