@@ -76,13 +76,13 @@ jobs:
     - name: Download smoke test results for base
       uses: actions/download-artifact@v4
       with:
-        name: smoke-test-result-images/base
+        name: smoke-test-result-images-base
         path: /tmp/smoke-results
 
     - name: Download integration test results for base
       uses: actions/download-artifact@v4
       with:
-        name: integration-test-result-images/base
+        name: integration-test-result-images-base
         path: /tmp/integration-results
 
     - name: Check base image test results
@@ -127,15 +127,25 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download smoke test results
+      run: |
+        # Set sanitized artifact name
+        echo "ARTIFACT_NAME=smoke-test-result-$(echo "${{ matrix.image }}" | tr '/' '-')" >> $GITHUB_ENV
+
+    - name: Download smoke test results (artifact)
       uses: actions/download-artifact@v4
       with:
-        name: smoke-test-result-${{ matrix.image }}
+        name: ${{ env.ARTIFACT_NAME }}
         path: /tmp/smoke-results
 
     - name: Download integration test results
+      run: |
+        # Set sanitized artifact name
+        echo "ARTIFACT_NAME=integration-test-result-$(echo "${{ matrix.image }}" | tr '/' '-')" >> $GITHUB_ENV
+
+    - name: Download integration test results (artifact)
       uses: actions/download-artifact@v4
       with:
-        name: integration-test-result-${{ matrix.image }}
+        name: ${{ env.ARTIFACT_NAME }}
         path: /tmp/integration-results
 
     - name: Check image test results

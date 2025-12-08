@@ -90,8 +90,14 @@ jobs:
 
     - name: Upload test results
       if: always()
+      run: |
+        # Set sanitized artifact name
+        echo "ARTIFACT_NAME=integration-test-result-$(echo "${{ matrix.image }}" | tr '/' '-')" >> $GITHUB_ENV
+
+    - name: Upload test results (artifact)
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: integration-test-result-${{ matrix.image }}
+        name: ${{ env.ARTIFACT_NAME }}
         path: integration-test-results.txt
         retention-days: 1
